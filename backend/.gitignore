@@ -1,0 +1,4 @@
+node_modules/
+.env
+*.log
+setup-db.js

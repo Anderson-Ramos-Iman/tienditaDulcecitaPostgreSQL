@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tiendita Dulcecita – Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ============================================================ LAYOUT -->
+<div class="admin-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="fa-solid fa-store"></i></div>
+      <span>Tiendita<br><small style="font-weight:400;font-size:11px;color:#94a3b8">Dulcecita</small></span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Principal</div>
+      <div class="nav-item active" data-page="pos">     <i class="fa-solid fa-cash-register"></i> Nueva Venta</div>
+      <div class="nav-item"        data-page="ventas">  <i class="fa-solid fa-receipt"></i> Ventas</div>
+      <div class="nav-section">Inventario</div>
+      <div class="nav-item"        data-page="productos"><i class="fa-solid fa-box"></i> Productos</div>
+      <div class="nav-item"        data-page="compras"> <i class="fa-solid fa-truck"></i> Compras</div>
+      <div class="nav-section">Finanzas</div>
+      <div class="nav-item"        data-page="caja">    <i class="fa-solid fa-vault"></i> Caja</div>
+      <div class="nav-item"        data-page="deudas">  <i class="fa-solid fa-file-invoice-dollar"></i> Deudas</div>
+      <div class="nav-item"        data-page="prestamos"><i class="fa-solid fa-hand-holding-dollar"></i> Préstamos</div>
+      <div class="nav-section">Clientes</div>
+      <div class="nav-item"        data-page="clientes"><i class="fa-solid fa-users"></i> Clientes</div>
+    </nav>
+    <div style="padding:14px 16px;border-top:1px solid #1e293b">
+      <button id="btn-logout" class="btn btn-outline" style="width:100%;color:#94a3b8;border-color:#334155;justify-content:center">
+        <i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-icon" id="sidebar-toggle" style="display:none"><i class="fa-solid fa-bars"></i></button>
+        <span class="topbar-title" id="page-title">Nueva Venta</span>
+      </div>
+      <div class="topbar-right">
+        <a href="/home" class="btn btn-outline btn-sm" target="_blank"><i class="fa-solid fa-store"></i> Catálogo</a>
+        <div class="user-info">
+          <div class="user-avatar" id="user-initial">A</div>
+          <span id="user-name">Admin</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- ======================================================= POS -->
+      <div class="page active" id="page-pos">
+        <div class="pos-layout">
+          <!-- Products panel -->
+          <div class="pos-left">
+            <div class="search-box" style="position:relative">
+              <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+              <input id="pos-search" type="text" class="form-control" placeholder="Buscar producto..." style="padding-left:34px">
+            </div>
+            <div id="pos-products" class="products-grid"></div>
+          </div>
+          <!-- Cart -->
+          <div class="pos-right">
+            <div class="cart-panel">
+              <div class="cart-header"><i class="fa-solid fa-cart-shopping"></i> Carrito <span id="cart-count" style="font-size:12px;font-weight:500;color:var(--text-muted)">(0)</span></div>
+              <div class="cart-items" id="cart-items">
+                <div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:13px">
+                  <i class="fa-solid fa-cart-shopping" style="font-size:28px;opacity:.3;display:block;margin-bottom:8px"></i>
+                  Agrega productos al carrito
+                </div>
+              </div>
+              <div class="cart-footer">
+                <div class="cart-row"><span>Subtotal</span><span id="cart-subtotal">S/ 0.00</span></div>
+                <div class="cart-row">
+                  <span>Redondeo</span>
+                  <input type="number" id="cart-redondeo" class="redondeo-input" value="0" step="0.01" min="-1" max="1">
+                </div>
+                <div class="cart-row cart-total-row"><span>TOTAL</span><span id="cart-total">S/ 0.00</span></div>
+                <div class="payment-section">
+                  <label>Tipo de pago</label>
+                  <select id="payment-type" class="form-control">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="yape">Yape</option>
+                    <option value="deuda">Deuda</option>
+                    <option value="mixto">Mixto</option>
+                    <option value="cortesia">Cortesía (gratis)</option>
+                  </select>
+                  <div id="field-efectivo" class="payment-field">
+                    <label>Monto recibido</label>
+                    <input type="number" id="monto-recibido" class="form-control" step="0.01" min="0" placeholder="0.00">
+                    <div id="vuelto" class="vuelto-info"></div>
+                  </div>
+                  <div id="field-cliente" class="payment-field hidden">
+                    <label>Cliente</label>
+                    <select id="select-cliente" class="form-control"><option value="">Seleccionar cliente...</option></select>
+                  </div>
+                  <div id="field-mixto-efectivo" class="payment-field hidden">
+                    <label>Monto Efectivo</label>
+                    <input type="number" id="mixto-efectivo" class="form-control" step="0.01" min="0" placeholder="0.00">
+                  </div>
+                  <div id="field-mixto-yape" class="payment-field hidden">
+                    <label>Monto Yape</label>
+                    <input type="number" id="mixto-yape" class="form-control" step="0.01" min="0" placeholder="0.00">
+                  </div>
+                </div>
+                <button id="btn-completar-venta" class="btn btn-success" style="width:100%;justify-content:center;margin-top:12px">
+                  <i class="fa-solid fa-check"></i> Completar Venta
+                </button>
+                <button id="btn-limpiar-carrito" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:6px">
+                  <i class="fa-solid fa-trash"></i> Limpiar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= VENTAS -->
+      <div class="page" id="page-ventas">
+        <div class="page-header">
+          <h2>Historial de Ventas</h2>
+          <button class="btn btn-outline btn-sm" id="btn-export-ventas"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
+        </div>
+        <div class="filters-row">
+          <div class="form-group"><label>Desde</label><input type="date" id="v-fecha-ini" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="v-fecha-fin" class="form-control"></div>
+          <div class="form-group">
+            <label>Tipo pago</label>
+            <select id="v-tipo" class="form-control">
+              <option value="">Todos</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="yape">Yape</option>
+              <option value="mixto">Mixto</option>
+              <option value="deuda">Deuda</option>
+              <option value="cortesia">Cortesía</option>
+            </select>
+          </div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-primary" id="btn-filtrar-ventas"><i class="fa-solid fa-filter"></i> Filtrar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Efectivo</th><th>Yape</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="table-ventas"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= PRODUCTOS -->
+      <div class="page" id="page-productos">
+        <div class="page-header">
+          <h2>Productos</h2>
+          <button class="btn btn-primary" id="btn-nuevo-producto"><i class="fa-solid fa-plus"></i> Nuevo Producto</button>
+        </div>
+        <div class="filters-row" style="margin-bottom:16px">
+          <div class="search-box" style="position:relative;flex:1;max-width:320px">
+            <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+            <input id="prod-search" type="text" class="form-control" placeholder="Buscar producto..." style="padding-left:34px">
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="table-productos"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= COMPRAS -->
+      <div class="page" id="page-compras">
+        <div class="page-header">
+          <h2>Compras</h2>
+          <button class="btn btn-primary" id="btn-nueva-compra"><i class="fa-solid fa-plus"></i> Registrar Compra</button>
+        </div>
+        <div class="filters-row">
+          <div class="form-group"><label>Desde</label><input type="date" id="c-fecha-ini" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="c-fecha-fin" class="form-control"></div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-primary" id="btn-filtrar-compras"><i class="fa-solid fa-filter"></i> Filtrar</button>
+          </div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-outline btn-sm" id="btn-export-compras"><i class="fa-solid fa-file-excel"></i> Exportar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Fecha</th><th>Total</th><th>Efectivo</th><th>Yape</th><th>Externo</th><th>Préstamo</th><th></th></tr></thead>
+              <tbody id="table-compras"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= CAJA -->
+      <div class="page" id="page-caja">
+        <div class="page-header"><h2>Caja</h2></div>
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card"><div class="label">Saldo Efectivo</div><div class="value" id="caja-efectivo">S/ 0.00</div></div>
+          <div class="stat-card"><div class="label">Saldo Yape</div><div class="value" id="caja-yape">S/ 0.00</div></div>
+          <div class="stat-card"><div class="label">Total Caja</div><div class="value" id="caja-total">S/ 0.00</div></div>
+        </div>
+        <div class="page-header" style="margin-bottom:16px">
+          <h3 style="font-size:16px">Movimientos</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success btn-sm" id="btn-apertura-caja"><i class="fa-solid fa-unlock"></i> Apertura</button>
+            <button class="btn btn-outline btn-sm"  id="btn-movimiento-manual"><i class="fa-solid fa-plus-minus"></i> Movimiento</button>
+            <button class="btn btn-outline btn-sm"  id="btn-ajuste-saldo"><i class="fa-solid fa-sliders"></i> Ajuste</button>
+          </div>
+        </div>
+        <div class="filters-row">
+          <div class="form-group"><label>Desde</label><input type="date" id="caja-fecha-ini" class="form-control"></div>
+          <div class="form-group"><label>Hasta</label><input type="date" id="caja-fecha-fin" class="form-control"></div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-primary btn-sm" id="btn-filtrar-caja"><i class="fa-solid fa-filter"></i> Filtrar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Origen</th><th>Método</th><th>Monto</th><th>Descripción</th></tr></thead>
+              <tbody id="table-movimientos"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= DEUDAS -->
+      <div class="page" id="page-deudas">
+        <div class="page-header"><h2>Deudas</h2></div>
+        <div class="filters-row">
+          <div class="form-group">
+            <label>Estado</label>
+            <select id="d-estado" class="form-control">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="pagada">Pagada</option>
+            </select>
+          </div>
+          <div class="form-group" style="align-self:flex-end">
+            <button class="btn btn-primary" id="btn-filtrar-deudas"><i class="fa-solid fa-filter"></i> Filtrar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Cliente</th><th>Total Deuda</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="table-deudas"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= PRESTAMOS -->
+      <div class="page" id="page-prestamos">
+        <div class="page-header">
+          <h2>Préstamos</h2>
+          <button class="btn btn-primary" id="btn-nuevo-prestamo"><i class="fa-solid fa-plus"></i> Registrar</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Descripción</th><th>Monto</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="table-prestamos"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= CLIENTES -->
+      <div class="page" id="page-clientes">
+        <div class="page-header">
+          <h2>Clientes</h2>
+          <button class="btn btn-primary" id="btn-nuevo-cliente"><i class="fa-solid fa-plus"></i> Nuevo</button>
+        </div>
+        <div class="filters-row" style="margin-bottom:16px">
+          <div class="search-box" style="position:relative;flex:1;max-width:320px">
+            <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+            <input id="cli-search" type="text" class="form-control" placeholder="Buscar cliente..." style="padding-left:34px">
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Tiene cuenta</th><th></th></tr></thead>
+              <tbody id="table-clientes"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div><!-- /main-content -->
+</div><!-- /admin-layout -->
+
+<!-- ============================================================ MODALS -->
+
+<!-- Producto Modal -->
+<div class="modal-overlay hidden" id="modal-producto">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-producto-title">Nuevo Producto</h3>
+      <button class="modal-close" data-close="modal-producto">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="prod-id">
+      <div class="form-group"><label>Nombre</label><input id="prod-nombre" class="form-control" placeholder="Nombre del producto"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Precio base (S/)</label><input id="prod-precio" type="number" step="0.01" min="0" class="form-control"></div>
+        <div class="form-group"><label>Stock inicial</label><input id="prod-stock" type="number" min="0" class="form-control"></div>
+      </div>
+      <div class="form-group">
+        <label>Tipo de venta</label>
+        <select id="prod-tipo" class="form-control">
+          <option value="unidad">Por unidad</option>
+          <option value="por_peso">Por peso / kg</option>
+        </select>
+      </div>
+      <div class="form-group"><label>URL de imagen (opcional)</label><input id="prod-imagen" class="form-control" placeholder="https://..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-producto">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-producto"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Compra Modal -->
+<div class="modal-overlay hidden" id="modal-compra">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>Registrar Compra</h3>
+      <button class="modal-close" data-close="modal-compra">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="compra-items" style="margin-bottom:16px"></div>
+      <button class="btn btn-outline btn-sm" id="btn-add-compra-item"><i class="fa-solid fa-plus"></i> Agregar producto</button>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+      <div class="form-row-3">
+        <div class="form-group"><label>Efectivo (S/)</label><input id="compra-efectivo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+        <div class="form-group"><label>Yape (S/)</label><input id="compra-yape" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+        <div class="form-group"><label>Externo (S/)</label><input id="compra-externo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Préstamo (S/)</label><input id="compra-prestamo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+        <div class="form-group"><label>Ajuste redondeo (S/)</label><input id="compra-redondeo" type="number" step="0.01" value="0" class="form-control"></div>
+      </div>
+      <div class="form-group"><label>Descripción préstamo</label><input id="compra-prestamo-desc" class="form-control" placeholder="Opcional"></div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px 16px;font-size:14px">
+        Total calculado: <strong id="compra-total-calc">S/ 0.00</strong>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-compra">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-floppy-disk"></i> Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pagar deuda modal -->
+<div class="modal-overlay hidden" id="modal-pagar-deuda">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Registrar Pago</h3>
+      <button class="modal-close" data-close="modal-pagar-deuda">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pago-deuda-id">
+      <p id="pago-deuda-info" style="margin-bottom:14px;color:var(--text-muted);font-size:13px"></p>
+      <div class="form-row">
+        <div class="form-group"><label>Efectivo (S/)</label><input id="pago-efectivo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+        <div class="form-group"><label>Yape (S/)</label><input id="pago-yape" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-pagar-deuda">Cancelar</button>
+      <button class="btn btn-success" id="btn-confirmar-pago"><i class="fa-solid fa-check"></i> Registrar Pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Préstamo modal -->
+<div class="modal-overlay hidden" id="modal-prestamo">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Nuevo Préstamo</h3>
+      <button class="modal-close" data-close="modal-prestamo">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Descripción</label><input id="prestamo-desc" class="form-control" placeholder="A quién se prestó..."></div>
+      <div class="form-group"><label>Monto (S/)</label><input id="prestamo-monto" type="number" step="0.01" min="0" class="form-control"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-prestamo">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-prestamo"><i class="fa-solid fa-floppy-disk"></i> Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cliente modal -->
+<div class="modal-overlay hidden" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-cliente-title">Nuevo Cliente</h3>
+      <button class="modal-close" data-close="modal-cliente">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cliente-id">
+      <div class="form-group"><label>Nombre</label><input id="cliente-nombre" class="form-control" placeholder="Nombre completo"></div>
+      <div class="form-group"><label>Teléfono</label><input id="cliente-telefono" class="form-control" placeholder="999 999 999"></div>
+      <div class="form-group" style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" id="cliente-cuenta" style="width:16px;height:16px">
+        <label for="cliente-cuenta" style="text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--text)">Tiene cuenta (puede comprar a deuda)</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-cliente">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-cliente"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Caja movimiento manual modal -->
+<div class="modal-overlay hidden" id="modal-movimiento">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Movimiento Manual</h3>
+      <button class="modal-close" data-close="modal-movimiento">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="mov-tipo" class="form-control">
+            <option value="entrada">Entrada</option>
+            <option value="salida">Salida</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Método</label>
+          <select id="mov-metodo" class="form-control">
+            <option value="efectivo">Efectivo</option>
+            <option value="yape">Yape</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Monto (S/)</label><input id="mov-monto" type="number" step="0.01" min="0" class="form-control"></div>
+      <div class="form-group"><label>Descripción</label><input id="mov-descripcion" class="form-control" placeholder="Ej: Pago de servicio..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-movimiento">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar-movimiento"><i class="fa-solid fa-floppy-disk"></i> Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ajuste saldo modal -->
+<div class="modal-overlay hidden" id="modal-ajuste">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Ajuste de Saldo</h3>
+      <button class="modal-close" data-close="modal-ajuste">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Nuevo saldo efectivo (S/)</label><input id="ajuste-efectivo" type="number" step="0.01" min="0" class="form-control"></div>
+      <div class="form-group"><label>Nuevo saldo Yape (S/)</label><input id="ajuste-yape" type="number" step="0.01" min="0" class="form-control"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-ajuste">Cancelar</button>
+      <button class="btn btn-warning" id="btn-confirmar-ajuste"><i class="fa-solid fa-sliders"></i> Aplicar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="modal-overlay hidden" id="confirm-dialog">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3 id="confirm-title">Confirmar</h3>
+      <button class="modal-close" data-close="confirm-dialog">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-msg" style="color:var(--text-muted);font-size:13.5px;line-height:1.5"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="confirm-dialog">Cancelar</button>
+      <button class="btn btn-danger" id="btn-confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

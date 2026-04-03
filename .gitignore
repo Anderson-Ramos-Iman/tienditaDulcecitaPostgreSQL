@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+backend/setup-db.js
+app-movil/.expo/
+app-movil/node_modules/
+app-movil/.gradle/
+app-movil/build/

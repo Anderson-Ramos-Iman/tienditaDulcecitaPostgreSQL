@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Tiendita Dulcecita",
+    "slug": "tiendita-dulcecita",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tiendita.dulcecita"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.tiendita.dulcecita"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
