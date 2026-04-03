@@ -252,6 +252,7 @@
           <button class="btn btn-outline btn-sm" id="btn-cierre-caja"><i class="fa-solid fa-lock"></i> Cierre</button>
           <button class="btn btn-outline btn-sm" id="btn-ajuste-saldo"><i class="fa-solid fa-sliders"></i> Ajuste de Caja</button>
           <button class="btn btn-outline btn-sm" id="btn-movimiento-manual"><i class="fa-solid fa-plus-minus"></i> Movimiento</button>
+          <button class="btn btn-success btn-sm" id="btn-generar-reporte"><i class="fa-solid fa-file-pdf"></i> Generar Reporte</button>
         </div>
 
         <!-- Prestamos inline -->
@@ -486,6 +487,27 @@
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-compra">Cancelar</button>
       <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-check"></i> Registrar Compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reporte Modal -->
+<div class="modal-overlay hidden" id="modal-reporte">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-file-pdf" style="color:var(--success);margin-right:8px"></i>Generar Reporte</h3>
+      <button class="modal-close" data-close="modal-reporte">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:16px;color:var(--text-muted);font-size:13px">Selecciona el rango de fechas. El reporte incluirá ventas, compras, caja, deudas, préstamos y stock.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0"><label>Fecha inicio</label><input type="date" id="reporte-fecha-ini" class="form-control"></div>
+        <div class="form-group" style="margin:0"><label>Fecha fin</label><input type="date" id="reporte-fecha-fin" class="form-control"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" data-close="modal-reporte">Cancelar</button>
+      <button class="btn btn-success" id="btn-confirmar-reporte"><i class="fa-solid fa-file-pdf"></i> Generar PDF</button>
     </div>
   </div>
 </div>

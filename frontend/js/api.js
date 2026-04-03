@@ -1,6 +1,6 @@
 const API_URL = window.APP_CONFIG?.API_URL || '/api';
 
-const getToken = () => localStorage.getItem('token');
+const getToken = () => sessionStorage.getItem('token');
 
 const api = {
   async request(method, path, body = null) {

@@ -45,8 +45,8 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 /* ============================================================
    AUTH GUARD
    ============================================================ */
-const token = localStorage.getItem('token');
-const user  = JSON.parse(localStorage.getItem('user') || '{}');
+const token = sessionStorage.getItem('token');
+const user  = JSON.parse(sessionStorage.getItem('user') || '{}');
 if (!token) { window.location.replace('/login'); }
 
 document.getElementById('user-name').textContent    = user.nombre || 'Admin';
@@ -57,7 +57,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 });
 
 document.getElementById('btn-logout-confirm').addEventListener('click', () => {
-  localStorage.clear();
+  sessionStorage.clear();
   window.location.replace('/login');
 });
 
@@ -855,6 +855,146 @@ document.getElementById('btn-confirmar-ajuste').addEventListener('click', async 
   try { await cajaAPI.ajuste(data); showOk('Saldo ajustado'); closeModal('modal-ajuste'); loadCaja(); }
   catch (e) { showErr(e.message); }
 });
+
+document.getElementById('btn-generar-reporte').addEventListener('click', () => {
+  const hoy  = new Date();
+  const mes1 = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+  const hoyS = hoy.toISOString().split('T')[0];
+  document.getElementById('reporte-fecha-ini').value = mes1;
+  document.getElementById('reporte-fecha-fin').value = hoyS;
+  openModal('modal-reporte');
+});
+
+document.getElementById('btn-confirmar-reporte').addEventListener('click', async () => {
+  const fi = document.getElementById('reporte-fecha-ini').value;
+  const ff = document.getElementById('reporte-fecha-fin').value;
+  if (!fi || !ff) { showWarn('Selecciona las fechas'); return; }
+  closeModal('modal-reporte');
+  await generarReporte(fi, ff);
+});
+
+async function generarReporte(fechaIni, fechaFin) {
+  try {
+    const params = new URLSearchParams({ fecha_inicio: fechaIni, fecha_fin: fechaFin }).toString();
+    const [ventasRes, comprasRes, cajaRes, deudasRes, prestamosRes, productosRes] = await Promise.all([
+      ventasAPI.getAll(params),
+      comprasAPI.getAll(params),
+      cajaAPI.get(),
+      deudasAPI.getResumen(),
+      prestamosAPI.getAll(),
+      productosAPI.getAll()
+    ]);
+
+    const ventas    = (ventasRes.data    || []).filter(v => v.estado !== 'anulada');
+    const compras   = comprasRes.data    || [];
+    const caja      = cajaRes.data       || {};
+    const deudas    = deudasRes.data     || [];
+    const prestamos = (prestamosRes.data || []).filter(p => p.estado === 'pendiente');
+    const productos = (productosRes.data || []).filter(p => p.activo != 0);
+
+    const totalVentas   = ventas.reduce((s, v) => s + parseFloat(v.total || 0), 0);
+    const totalCompras  = compras.reduce((s, c) => s + parseFloat(c.total || 0), 0);
+    const totalDeudas   = deudas.reduce((s, d) => s + Math.max(0, parseFloat(d.deuda_total || 0) - parseFloat(d.total_pagado || 0)), 0);
+    const totalPrestamo = prestamos.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+    const efe = parseFloat(caja.saldo_efectivo || 0);
+    const yap = parseFloat(caja.saldo_yape    || 0);
+
+    const fR  = v => `S/ ${parseFloat(v || 0).toFixed(2)}`;
+    const fDR = d => d ? new Date(d).toLocaleDateString('es-PE') : '—';
+
+    const ventasRows = ventas.map(v => `<tr>
+      <td>#${v.id}</td><td>${fDR(v.fecha)}</td><td>${v.cliente_nombre || 'Sin cliente'}</td>
+      <td style="text-align:right">${fR(v.total)}</td><td>${v.metodo_pago || '—'}</td></tr>`).join('');
+
+    const comprasRows = compras.map(c => `<tr>
+      <td>#${c.id}</td><td>${fDR(c.fecha)}</td>
+      <td style="text-align:right">${fR(c.total)}</td>
+      <td style="text-align:right">${fR(c.monto_prestado)}</td></tr>`).join('');
+
+    const deudasPend = deudas.filter(d => parseInt(d.deudas_pendientes) > 0);
+    const deudasRows = deudasPend.map(d => {
+      const sal = Math.max(0, parseFloat(d.deuda_total || 0) - parseFloat(d.total_pagado || 0));
+      return `<tr><td>${d.cliente_nombre}</td><td>${d.cliente_telefono || '—'}</td>
+        <td style="text-align:right">${fR(d.deuda_total)}</td>
+        <td style="text-align:right">${fR(d.total_pagado)}</td>
+        <td style="text-align:right;color:#dc2626;font-weight:700">${fR(sal)}</td></tr>`;
+    }).join('');
+
+    const prestamosRows = prestamos.map(p => `<tr>
+      <td>${p.descripcion}</td><td>${fDR(p.fecha)}</td>
+      <td style="text-align:right;color:#d97706;font-weight:700">${fR(p.monto)}</td></tr>`).join('');
+
+    const productosRows = productos.map(p => `<tr>
+      <td>${p.nombre}</td>
+      <td style="text-align:center">${p.tipo_venta === 'por_peso' ? 'Peso/kg' : 'Unidad'}</td>
+      <td style="text-align:right">${fR(p.precio_base)}</td>
+      <td style="text-align:center;font-weight:700;color:${p.stock <= 0 ? '#dc2626' : p.stock <= 5 ? '#d97706' : '#16a34a'}">${p.stock}</td></tr>`).join('');
+
+    const css = `*{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;color:#1e293b;padding:28px;font-size:13px}
+      h1{font-size:21px;font-weight:800;color:#0f172a;margin-bottom:3px}
+      .sub{color:#64748b;font-size:12px;margin-bottom:22px}
+      h2{font-size:14px;font-weight:700;color:#1e293b;margin:22px 0 8px;padding-bottom:5px;border-bottom:2px solid #e2e8f0}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      th{background:#f8fafc;padding:6px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;border-bottom:2px solid #e2e8f0}
+      td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
+      .sg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+      .sc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}
+      .sc .lb{font-size:10px;color:#64748b;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em}
+      .sc .vl{font-size:16px;font-weight:800}
+      .sc.gr .vl{color:#16a34a}.sc.bl .vl{color:#3b82f6}.sc.am .vl{color:#d97706}
+      .tot{font-weight:700;background:#f8fafc}
+      .foot{margin-top:28px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:right}
+      @media print{body{padding:12px}}`;
+
+    const s = (rows, emptyMsg) => rows || `<tr><td colspan="10" style="color:#94a3b8;font-style:italic;padding:10px">${emptyMsg}</td></tr>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Reporte ${fechaIni} – ${fechaFin}</title>
+      <style>${css}</style></head><body>
+      <h1>📊 Reporte General — Tiendita Dulcecita</h1>
+      <p class="sub">Período: <strong>${fechaIni}</strong> al <strong>${fechaFin}</strong> &nbsp;|&nbsp; Generado: ${new Date().toLocaleString('es-PE')}</p>
+
+      <h2>💰 Estado de Caja</h2>
+      <div class="sg">
+        <div class="sc gr"><div class="lb">Efectivo</div><div class="vl">${fR(efe)}</div></div>
+        <div class="sc bl"><div class="lb">Yape</div><div class="vl">${fR(yap)}</div></div>
+        <div class="sc">   <div class="lb">Total</div><div class="vl">${fR(efe+yap)}</div></div>
+      </div>
+
+      <h2>🛒 Ventas del período (${ventas.length})</h2>
+      <table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th style="text-align:right">Total</th><th>Método</th></tr></thead>
+      <tbody>${s(ventasRows,'Sin ventas en el período')}
+      ${ventas.length?`<tr class="tot"><td colspan="3">Total ventas</td><td style="text-align:right;color:#16a34a">${fR(totalVentas)}</td><td></td></tr>`:''}</tbody></table>
+
+      <h2>📦 Compras del período (${compras.length})</h2>
+      <table><thead><tr><th>#</th><th>Fecha</th><th style="text-align:right">Total</th><th style="text-align:right">Prestado</th></tr></thead>
+      <tbody>${s(comprasRows,'Sin compras en el período')}
+      ${compras.length?`<tr class="tot"><td colspan="2">Total compras</td><td style="text-align:right;color:#dc2626">${fR(totalCompras)}</td><td></td></tr>`:''}</tbody></table>
+
+      <h2>⚠️ Deudas pendientes por cliente (${deudasPend.length})</h2>
+      <table><thead><tr><th>Cliente</th><th>Teléfono</th><th style="text-align:right">Total Deuda</th><th style="text-align:right">Pagado</th><th style="text-align:right">Saldo</th></tr></thead>
+      <tbody>${s(deudasRows,'Sin deudas pendientes')}
+      ${deudasPend.length?`<tr class="tot"><td colspan="4">Total pendiente</td><td style="text-align:right;color:#dc2626">${fR(totalDeudas)}</td></tr>`:''}</tbody></table>
+
+      <h2>🤝 Préstamos pendientes (${prestamos.length})</h2>
+      <table><thead><tr><th>Descripción</th><th>Fecha</th><th style="text-align:right">Monto</th></tr></thead>
+      <tbody>${s(prestamosRows,'Sin préstamos pendientes')}
+      ${prestamos.length?`<tr class="tot"><td colspan="2">Total prestado</td><td style="text-align:right;color:#d97706">${fR(totalPrestamo)}</td></tr>`:''}</tbody></table>
+
+      <h2>🏷️ Inventario actual (${productos.length} productos)</h2>
+      <table><thead><tr><th>Producto</th><th style="text-align:center">Tipo</th><th style="text-align:right">Precio base</th><th style="text-align:center">Stock</th></tr></thead>
+      <tbody>${productosRows}</tbody></table>
+
+      <div class="foot">Reporte generado por Tiendita Dulcecita · ${new Date().toLocaleString('es-PE')}</div>
+      </body></html>`;
+
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
+  } catch (e) { showErr('Error generando reporte: ' + e.message); }
+}
 
 /* ============================================================
    DEUDAS
