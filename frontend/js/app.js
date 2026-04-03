@@ -87,7 +87,7 @@ let allProductosPOS = [];
 PAGE_LOADERS.pos = async () => {
   try {
     const res = await productosAPI.getAll();
-    allProductosPOS = (res.data || []).filter(p => p.activo != 0 && p.stock > 0);
+    allProductosPOS = (res.data || []).filter(p => p.activo != 0);
     renderPOSProducts(allProductosPOS);
     await loadClientesSelect();
   } catch (e) { showErr(e.message); }
@@ -96,18 +96,22 @@ PAGE_LOADERS.pos = async () => {
 function renderPOSProducts(list) {
   const grid = document.getElementById('pos-products');
   if (!list.length) { grid.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:16px">Sin productos</p>'; return; }
-  grid.innerHTML = list.map(p => `
-    <div class="product-card" data-id="${p.id}">
+  grid.innerHTML = list.map(p => {
+    const agotado = p.stock <= 0;
+    return `
+    <div class="product-card${agotado ? ' product-card--agotado' : ''}" data-id="${p.id}">
       <div class="product-img">
-        ${p.imagen_url ? `<img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-box\\'></i>'">` : '<i class="fa-solid fa-box"></i>'}
+        ${p.imagen_url ? `<img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-box\'></i>'">` : '<i class="fa-solid fa-box"></i>'}
+        ${agotado ? '<div class="agotado-badge">Agotado</div>' : ''}
       </div>
       <div class="product-info">
         <div class="product-name">${p.nombre}</div>
         <div class="product-price">${fmt(p.precio_base)}</div>
         <div class="product-stock">Stock: ${p.stock}</div>
       </div>
-    </div>`).join('');
-  grid.querySelectorAll('.product-card').forEach(card => {
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.product-card:not(.product-card--agotado)').forEach(card => {
     card.addEventListener('click', () => addToCart(parseInt(card.dataset.id)));
   });
 }
@@ -841,6 +845,25 @@ async function eliminarCliente(id) {
   try { await clientesAPI.delete(id); showOk('Cliente eliminado'); loadClientes(); }
   catch (e) { showErr(e.message); }
 }
+
+/* ============================================================
+   SIDEBAR TOGGLE (mobile)
+   ============================================================ */
+const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+const sidebarEl        = document.getElementById('sidebar');
+const sidebarOverlay   = document.getElementById('sidebar-overlay');
+
+function openSidebar()  { sidebarEl.classList.add('open'); sidebarOverlay?.classList.add('active'); }
+function closeSidebar() { sidebarEl.classList.remove('open'); sidebarOverlay?.classList.remove('active'); }
+
+sidebarToggleBtn?.addEventListener('click', () => {
+  sidebarEl.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+sidebarOverlay?.addEventListener('click', closeSidebar);
+
+document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+  item.addEventListener('click', () => { if (window.innerWidth < 768) closeSidebar(); });
+});
 
 /* ============================================================
    INIT

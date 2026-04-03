@@ -52,7 +52,7 @@
     const empty = document.getElementById('catalog-empty');
     const count = document.getElementById('count-label');
 
-    const activos = list.filter(p => p.activo != 0 && p.stock > 0);
+    const activos = list.filter(p => p.activo != 0);
     count.textContent = `${activos.length} producto${activos.length !== 1 ? 's' : ''} disponibles`;
 
     if (!activos.length) {
@@ -66,9 +66,11 @@
       const imgHtml = p.imagen_url
         ? `<img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\'></i>'">`
         : `<i class="fa-solid fa-box"></i>`;
-      const stockBadge = p.stock <= 5
-        ? `<span class="chip chip-warning" style="font-size:11px">Stock: ${p.stock}</span>`
-        : `<span class="chip chip-success" style="font-size:11px">Stock: ${p.stock}</span>`;
+      const stockBadge = p.stock <= 0
+        ? `<span class="chip chip-danger" style="font-size:11px">Agotado</span>`
+        : p.stock <= 5
+          ? `<span class="chip chip-warning" style="font-size:11px">Stock: ${p.stock}</span>`
+          : `<span class="chip chip-success" style="font-size:11px">Stock: ${p.stock}</span>`;
       return `
         <div class="catalog-card">
           <div class="img-area">${imgHtml}</div>
