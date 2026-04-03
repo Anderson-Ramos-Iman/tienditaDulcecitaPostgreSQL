@@ -481,80 +481,124 @@ document.getElementById('btn-export-compras').addEventListener('click', () => {
   XLSX.writeFile(wb, `compras_${new Date().toISOString().slice(0,10)}.xlsx`);
 });
 
-document.getElementById('btn-nueva-compra').addEventListener('click', async () => {
+async function abrirModalCompra() {
   compraItems = [];
-  renderCompraItems();
+  renderCompraItemsTable();
   document.getElementById('compra-efectivo').value = '0';
   document.getElementById('compra-yape').value = '0';
   document.getElementById('compra-externo').value = '0';
   document.getElementById('compra-prestamo').value = '0';
   document.getElementById('compra-redondeo').value = '0';
   document.getElementById('compra-prestamo-desc').value = '';
-  openModal('modal-compra');
-});
+  document.getElementById('compra-add-prod').value = '';
+  document.getElementById('compra-add-cant').value = '1';
+  document.getElementById('compra-add-monto').value = '0.00';
+  document.getElementById('compra-add-precio-ref').value = '';
+  document.getElementById('compra-add-bonif').checked = false;
+  document.getElementById('compra-total-calc').textContent = 'S/ 0.00';
 
-function renderCompraItems() {
-  const cont = document.getElementById('compra-items');
-  if (!compraItems.length) { cont.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin-bottom:8px">Sin productos aún</p>'; updateCompraTotalCalc(); return; }
-  cont.innerHTML = compraItems.map((item, i) => `
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end">
-      <div class="form-group" style="margin:0"><label>Producto</label>
-        <select class="form-control" onchange="setCompraItemProd(${i},this.value)">
-          <option value="">Seleccionar...</option>
-          ${(window._productosList||[]).map(p=>`<option value="${p.id}" ${p.id==item.producto_id?'selected':''}>${p.nombre}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group" style="margin:0"><label>Cantidad</label>
-        <input type="number" min="1" value="${item.cantidad}" class="form-control" onchange="setCompraItemCantidad(${i},this.value)">
-      </div>
-      <div class="form-group" style="margin:0"><label>Precio unit.</label>
-        <input type="number" step="0.01" min="0" value="${item.precio_unitario}" class="form-control" onchange="setCompraItemPrecio(${i},this.value)">
-      </div>
-      <button class="btn btn-danger btn-sm" style="margin-bottom:0;align-self:flex-end" onclick="removeCompraItem(${i})"><i class="fa-solid fa-xmark"></i></button>
-    </div>`).join('');
-  updateCompraTotalCalc();
-}
-
-function updateCompraTotalCalc() {
-  let sub = 0;
-  compraItems.forEach(i => { sub += (i.cantidad || 0) * (i.precio_unitario || 0); });
-  const redondeo = parseFloat(document.getElementById('compra-redondeo').value) || 0;
-  document.getElementById('compra-total-calc').textContent = fmt(sub - redondeo);
-}
-document.getElementById('compra-redondeo').addEventListener('input', updateCompraTotalCalc);
-
-function setCompraItemProd(i, val) { compraItems[i].producto_id = parseInt(val) || null; }
-function setCompraItemCantidad(i, val) { compraItems[i].cantidad = parseInt(val) || 1; updateCompraTotalCalc(); }
-function setCompraItemPrecio(i, val) { compraItems[i].precio_unitario = parseFloat(val) || 0; updateCompraTotalCalc(); }
-function removeCompraItem(i) { compraItems.splice(i, 1); renderCompraItems(); }
-
-document.getElementById('btn-add-compra-item').addEventListener('click', async () => {
-  if (!window._productosList) {
-    const r = await productosAPI.getAll();
-    window._productosList = r.data || [];
+  const sel = document.getElementById('compra-add-prod');
+  if (sel.options.length <= 1) {
+    try {
+      const r = await productosAPI.getAll();
+      (r.data || []).forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = p.nombre;
+        sel.appendChild(o);
+      });
+    } catch {}
   }
-  compraItems.push({ producto_id: null, cantidad: 1, precio_unitario: 0, es_bonificacion: false });
-  renderCompraItems();
+  openModal('modal-compra');
+}
+
+document.getElementById('btn-nueva-compra').addEventListener('click', abrirModalCompra);
+
+function calcPrecioRef() {
+  const cant  = parseFloat(document.getElementById('compra-add-cant').value) || 0;
+  const monto = parseFloat(document.getElementById('compra-add-monto').value) || 0;
+  const ref   = document.getElementById('compra-add-precio-ref');
+  const bonif = document.getElementById('compra-add-bonif').checked;
+  if (bonif) { ref.value = 'Bonif.'; return; }
+  ref.value = (cant > 0 && monto > 0) ? (monto / cant).toFixed(4) : '';
+}
+
+document.getElementById('compra-add-cant').addEventListener('input', calcPrecioRef);
+document.getElementById('compra-add-monto').addEventListener('input', calcPrecioRef);
+document.getElementById('compra-add-bonif').addEventListener('change', calcPrecioRef);
+
+document.getElementById('btn-add-compra-item').addEventListener('click', () => {
+  const prodId  = parseInt(document.getElementById('compra-add-prod').value);
+  const prodNom = document.getElementById('compra-add-prod').selectedOptions[0]?.text || '';
+  const cant    = parseFloat(document.getElementById('compra-add-cant').value) || 1;
+  const monto   = parseFloat(document.getElementById('compra-add-monto').value) || 0;
+  const bonif   = document.getElementById('compra-add-bonif').checked;
+
+  if (!prodId) { showWarn('Selecciona un producto'); return; }
+
+  const precioUnit = bonif ? 0 : (cant > 0 ? monto / cant : 0);
+  const subtotal   = bonif ? 0 : parseFloat((cant * precioUnit).toFixed(2));
+
+  compraItems.push({ producto_id: prodId, nombre: prodNom, cantidad: cant, monto_total_paquete: monto, precio_unitario: parseFloat(precioUnit.toFixed(4)), subtotal, es_bonificacion: bonif });
+  renderCompraItemsTable();
+
+  document.getElementById('compra-add-prod').value = '';
+  document.getElementById('compra-add-cant').value = '1';
+  document.getElementById('compra-add-monto').value = '0.00';
+  document.getElementById('compra-add-precio-ref').value = '';
+  document.getElementById('compra-add-bonif').checked = false;
 });
+
+function renderCompraItemsTable() {
+  const tbody = document.getElementById('compra-items-table');
+  if (!compraItems.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Sin productos agregados</td></tr>';
+    document.getElementById('compra-total-calc').textContent = 'S/ 0.00';
+    return;
+  }
+  tbody.innerHTML = compraItems.map((item, i) => `
+    <tr>
+      <td>
+        ${item.nombre}
+        ${item.es_bonificacion ? '<span class="chip chip-warning" style="margin-left:6px;font-size:10px"><i class="fa-solid fa-gift"></i> Bonif.</span>' : ''}
+      </td>
+      <td style="text-align:center">${item.cantidad}</td>
+      <td style="text-align:right">${item.es_bonificacion ? '—' : fmt(item.precio_unitario)}</td>
+      <td style="text-align:right">${item.es_bonificacion ? '<span style="color:var(--text-muted)">Gratis</span>' : fmt(item.subtotal)}</td>
+      <td style="text-align:center">
+        <button class="btn btn-danger btn-sm" onclick="removeCompraItem(${i})"><i class="fa-solid fa-xmark"></i></button>
+      </td>
+    </tr>`).join('');
+
+  const total = compraItems.reduce((s, i) => s + (i.es_bonificacion ? 0 : i.subtotal), 0);
+  const redondeo = parseFloat(document.getElementById('compra-redondeo').value) || 0;
+  document.getElementById('compra-total-calc').textContent = fmt(total - redondeo);
+}
+
+function removeCompraItem(i) { compraItems.splice(i, 1); renderCompraItemsTable(); }
+
+document.getElementById('compra-redondeo').addEventListener('input', renderCompraItemsTable);
 
 document.getElementById('btn-guardar-compra').addEventListener('click', async () => {
-  const prods = compraItems.filter(i => i.producto_id);
-  if (!prods.length) { showWarn('Agrega al menos un producto'); return; }
+  if (!compraItems.length) { showWarn('Agrega al menos un producto'); return; }
   const data = {
-    productos:     prods,
-    monto_efectivo:parseFloat(document.getElementById('compra-efectivo').value) || 0,
-    monto_yape:    parseFloat(document.getElementById('compra-yape').value) || 0,
-    monto_externo: parseFloat(document.getElementById('compra-externo').value) || 0,
-    monto_prestado:parseFloat(document.getElementById('compra-prestamo').value) || 0,
-    ajuste_redondeo: parseFloat(document.getElementById('compra-redondeo').value) || 0,
-    prestado_descripcion: document.getElementById('compra-prestamo-desc').value.trim()
+    productos: compraItems.map(i => ({
+      producto_id:    i.producto_id,
+      cantidad:       i.cantidad,
+      precio_unitario:i.precio_unitario,
+      es_bonificacion:i.es_bonificacion
+    })),
+    monto_efectivo:      parseFloat(document.getElementById('compra-efectivo').value) || 0,
+    monto_yape:          parseFloat(document.getElementById('compra-yape').value) || 0,
+    monto_externo:       parseFloat(document.getElementById('compra-externo').value) || 0,
+    monto_prestado:      parseFloat(document.getElementById('compra-prestamo').value) || 0,
+    ajuste_redondeo:     parseFloat(document.getElementById('compra-redondeo').value) || 0,
+    prestado_descripcion:document.getElementById('compra-prestamo-desc').value.trim()
   };
   try {
     await comprasAPI.create(data);
     showOk('Compra registrada');
     closeModal('modal-compra');
     loadCompras();
-    if (window._productosList) window._productosList = null;
   } catch (e) { showErr(e.message); }
 });
 
@@ -568,7 +612,7 @@ async function cancelarCompra(id) {
 /* ============================================================
    CAJA
    ============================================================ */
-PAGE_LOADERS.caja = () => { loadCaja(); loadMovimientos(); };
+PAGE_LOADERS.caja = () => { loadCaja(); loadMovimientos(); loadCajaPrestamos(); };
 
 async function loadCaja() {
   try {
@@ -580,6 +624,66 @@ async function loadCaja() {
     document.getElementById('caja-yape').textContent     = fmt(yap);
     document.getElementById('caja-total').textContent    = fmt(efe + yap);
   } catch (e) { showErr(e.message); }
+}
+
+async function loadCajaPrestamos() {
+  try {
+    const res = await prestamosAPI.getAll();
+    const list = res.data || [];
+    const pendientes = list.filter(p => p.estado !== 'devuelto');
+    const total = pendientes.reduce((s, p) => s + parseFloat(p.monto || 0), 0);
+    document.getElementById('caja-prestado').textContent = fmt(total);
+    renderCajaPrestamos(pendientes, total);
+  } catch (e) { showErr(e.message); }
+}
+
+function renderCajaPrestamos(list, total) {
+  const sec = document.getElementById('caja-prestamos-section');
+  if (!list.length) { sec.innerHTML = ''; return; }
+  sec.innerHTML = `
+    <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:#92400e">
+          <i class="fa-solid fa-hand-holding-dollar" style="color:#f59e0b"></i> Dinero Prestado
+          <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px">${fmt(total)}</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirNuevoPrestamo()">
+          <i class="fa-solid fa-plus"></i> Registrar préstamo
+        </button>
+      </div>
+      ${list.map(p => `
+        <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-weight:600;font-size:13px">${p.descripcion}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fmtDate(p.fecha)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-weight:700;font-size:14px;color:#92400e">${fmt(p.monto)}</span>
+            <button class="btn btn-success btn-sm" onclick="cajaDevolverPrestamo(${p.id})"><i class="fa-solid fa-check"></i> Devuelto</button>
+            <button class="btn btn-danger btn-sm"  onclick="cajaEliminarPrestamo(${p.id})"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function abrirNuevoPrestamo() {
+  document.getElementById('prestamo-desc').value = '';
+  document.getElementById('prestamo-monto').value = '';
+  openModal('modal-prestamo');
+}
+
+async function cajaDevolverPrestamo(id) {
+  const ok = await confirm('Marcar como devuelto', '¿Confirmas que este préstamo fue devuelto?');
+  if (!ok) return;
+  try { await prestamosAPI.devolver(id); showOk('Marcado como devuelto'); loadCajaPrestamos(); }
+  catch (e) { showErr(e.message); }
+}
+
+async function cajaEliminarPrestamo(id) {
+  const ok = await confirm('Eliminar préstamo', '¿Deseas eliminar este registro?');
+  if (!ok) return;
+  try { await prestamosAPI.delete(id); showOk('Eliminado'); loadCajaPrestamos(); }
+  catch (e) { showErr(e.message); }
 }
 
 async function loadMovimientos(params = '') {
@@ -616,6 +720,15 @@ document.getElementById('btn-apertura-caja').addEventListener('click', async () 
   if (isNaN(monto) || monto < 0) { showWarn('Monto inválido'); return; }
   try { await cajaAPI.apertura({ monto_inicial_efectivo: monto }); showOk('Apertura registrada'); loadCaja(); loadMovimientos(); }
   catch (e) { showErr(e.message); }
+});
+
+document.getElementById('btn-cierre-caja').addEventListener('click', async () => {
+  try {
+    const res = await cajaAPI.cierre();
+    const c = res.data || {};
+    showOk(`Cierre registrado — Efectivo: ${fmt(c.saldo_efectivo)} | Yape: ${fmt(c.saldo_yape)}`);
+    loadCaja(); loadMovimientos();
+  } catch (e) { showErr(e.message); }
 });
 
 document.getElementById('btn-movimiento-manual').addEventListener('click', () => {
@@ -746,7 +859,7 @@ document.getElementById('btn-guardar-prestamo').addEventListener('click', async 
   const desc  = document.getElementById('prestamo-desc').value.trim();
   const monto = parseFloat(document.getElementById('prestamo-monto').value);
   if (!desc || isNaN(monto) || monto <= 0) { showWarn('Completa los campos'); return; }
-  try { await prestamosAPI.create({ descripcion: desc, monto }); showOk('Préstamo registrado'); closeModal('modal-prestamo'); loadPrestamos(); }
+  try { await prestamosAPI.create({ descripcion: desc, monto }); showOk('Préstamo registrado'); closeModal('modal-prestamo'); loadPrestamos(); loadCajaPrestamos(); }
   catch (e) { showErr(e.message); }
 });
 

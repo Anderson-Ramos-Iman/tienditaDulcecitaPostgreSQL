@@ -215,24 +215,42 @@
       <!-- ======================================================= CAJA -->
       <div class="page" id="page-caja">
         <div class="page-header"><h2>Caja</h2></div>
-        <div class="stats-grid" style="margin-bottom:24px">
-          <div class="stat-card"><div class="label">Saldo Efectivo</div><div class="value" id="caja-efectivo">S/ 0.00</div></div>
-          <div class="stat-card"><div class="label">Saldo Yape</div><div class="value" id="caja-yape">S/ 0.00</div></div>
-          <div class="stat-card"><div class="label">Total Caja</div><div class="value" id="caja-total">S/ 0.00</div></div>
-        </div>
-        <div class="page-header" style="margin-bottom:16px">
-          <h3 style="font-size:16px">Movimientos</h3>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-success btn-sm" id="btn-apertura-caja"><i class="fa-solid fa-unlock"></i> Apertura</button>
-            <button class="btn btn-outline btn-sm"  id="btn-movimiento-manual"><i class="fa-solid fa-plus-minus"></i> Movimiento</button>
-            <button class="btn btn-outline btn-sm"  id="btn-ajuste-saldo"><i class="fa-solid fa-sliders"></i> Ajuste</button>
+        <div class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card">
+            <div class="label" style="display:flex;align-items:center;gap:6px"><i class="fa-solid fa-money-bill-wave" style="color:#16a34a"></i> Efectivo</div>
+            <div class="value" id="caja-efectivo">S/ 0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="label" style="display:flex;align-items:center;gap:6px"><i class="fa-solid fa-mobile-screen" style="color:#3b82f6"></i> Yape</div>
+            <div class="value" id="caja-yape">S/ 0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="label" style="display:flex;align-items:center;gap:6px"><i class="fa-solid fa-scale-balanced" style="color:#8b5cf6"></i> Total</div>
+            <div class="value" id="caja-total">S/ 0.00</div>
+          </div>
+          <div class="stat-card">
+            <div class="label" style="display:flex;align-items:center;gap:6px"><i class="fa-solid fa-hand-holding-dollar" style="color:#f59e0b"></i> Dinero Prestado</div>
+            <div class="value" style="color:var(--warning)" id="caja-prestado">S/ 0.00</div>
           </div>
         </div>
-        <div class="filters-row">
-          <div class="form-group"><label>Desde</label><input type="date" id="caja-fecha-ini" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="caja-fecha-fin" class="form-control"></div>
-          <div class="form-group" style="align-self:flex-end">
-            <button class="btn btn-primary btn-sm" id="btn-filtrar-caja"><i class="fa-solid fa-filter"></i> Filtrar</button>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="btn btn-primary btn-sm" id="btn-apertura-caja"><i class="fa-solid fa-unlock"></i> Apertura</button>
+          <button class="btn btn-outline btn-sm" id="btn-cierre-caja"><i class="fa-solid fa-lock"></i> Cierre</button>
+          <button class="btn btn-outline btn-sm" id="btn-ajuste-saldo"><i class="fa-solid fa-sliders"></i> Ajuste de Caja</button>
+          <button class="btn btn-outline btn-sm" id="btn-movimiento-manual"><i class="fa-solid fa-plus-minus"></i> Movimiento</button>
+        </div>
+
+        <!-- Prestamos inline -->
+        <div id="caja-prestamos-section" style="margin-bottom:20px"></div>
+
+        <!-- Movimientos -->
+        <div class="page-header" style="margin-bottom:12px">
+          <h3 style="font-size:15px;font-weight:700">Movimientos</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0"><label>Desde</label><input type="date" id="caja-fecha-ini" class="form-control"></div>
+            <div class="form-group" style="margin:0"><label>Hasta</label><input type="date" id="caja-fecha-fin" class="form-control"></div>
+            <button class="btn btn-primary btn-sm" id="btn-filtrar-caja" style="align-self:flex-end"><i class="fa-solid fa-filter"></i> Filtrar</button>
           </div>
         </div>
         <div class="card">
@@ -349,30 +367,101 @@
 <div class="modal-overlay hidden" id="modal-compra">
   <div class="modal modal-lg">
     <div class="modal-header">
-      <h3>Registrar Compra</h3>
+      <h3><i class="fa-solid fa-cart-shopping" style="color:var(--primary);margin-right:6px"></i> Nueva Compra a Proveedor</h3>
       <button class="modal-close" data-close="modal-compra">&times;</button>
     </div>
     <div class="modal-body">
-      <div id="compra-items" style="margin-bottom:16px"></div>
-      <button class="btn btn-outline btn-sm" id="btn-add-compra-item"><i class="fa-solid fa-plus"></i> Agregar producto</button>
-      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
-      <div class="form-row-3">
-        <div class="form-group"><label>Efectivo (S/)</label><input id="compra-efectivo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
-        <div class="form-group"><label>Yape (S/)</label><input id="compra-yape" type="number" step="0.01" min="0" value="0" class="form-control"></div>
-        <div class="form-group"><label>Externo (S/)</label><input id="compra-externo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+
+      <!-- Agregar producto -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">
+          <i class="fa-solid fa-circle-plus" style="color:var(--primary)"></i> Agregar Producto
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Producto</label>
+            <select id="compra-add-prod" class="form-control"><option value="">Seleccionar producto...</option></select>
+          </div>
+          <div class="form-group">
+            <label>Cantidad</label>
+            <input type="number" id="compra-add-cant" class="form-control" min="1" value="1">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Monto Total Paquete (S/)</label>
+            <input type="number" id="compra-add-monto" class="form-control" step="0.01" min="0" value="0.00" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Precio Unitario (Ref.)</label>
+            <input type="text" id="compra-add-precio-ref" class="form-control" readonly placeholder="Auto" style="background:#f8fafc;color:var(--text-muted);cursor:default">
+          </div>
+        </div>
+        <div style="background:#fefce8;border:1.5px dashed #f59e0b;border-radius:8px;padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="compra-add-bonif" style="width:15px;height:15px;cursor:pointer">
+          <label for="compra-add-bonif" style="font-size:12.5px;cursor:pointer;margin:0;color:var(--text)">
+            <i class="fa-solid fa-gift" style="color:#f59e0b"></i> Es bonificación (producto gratis del proveedor, no suma al total)
+          </label>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-add-compra-item">
+          <i class="fa-solid fa-plus"></i> Agregar al carrito
+        </button>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Préstamo (S/)</label><input id="compra-prestamo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
-        <div class="form-group"><label>Ajuste redondeo (S/)</label><input id="compra-redondeo" type="number" step="0.01" value="0" class="form-control"></div>
+
+      <!-- Lista de productos -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">
+          <i class="fa-solid fa-list-check" style="color:var(--primary)"></i> Productos a Comprar
+        </div>
+        <div class="card" style="overflow:hidden;padding:0">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th style="text-align:center">Cantidad</th>
+                  <th style="text-align:right">Precio Unitario</th>
+                  <th style="text-align:right">Subtotal</th>
+                  <th style="width:36px"></th>
+                </tr>
+              </thead>
+              <tbody id="compra-items-table">
+                <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted)">Sin productos agregados</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style="text-align:right;padding:10px 4px;font-size:15px;font-weight:700;color:var(--primary)">
+          Total de Compra: <span id="compra-total-calc">S/ 0.00</span>
+        </div>
       </div>
-      <div class="form-group"><label>Descripción préstamo</label><input id="compra-prestamo-desc" class="form-control" placeholder="Opcional"></div>
-      <div style="background:var(--bg);border-radius:8px;padding:12px 16px;font-size:14px">
-        Total calculado: <strong id="compra-total-calc">S/ 0.00</strong>
+
+      <!-- Forma de pago -->
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">
+          <i class="fa-solid fa-credit-card" style="color:var(--primary)"></i> Forma de Pago
+        </div>
+        <div class="form-row-3">
+          <div class="form-group"><label>Efectivo (S/)</label><input id="compra-efectivo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+          <div class="form-group"><label>Yape (S/)</label><input id="compra-yape" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+          <div class="form-group"><label>Externo (S/)</label><input id="compra-externo" type="number" step="0.01" min="0" value="0" class="form-control"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label><i class="fa-solid fa-person-walking-arrow-right" style="color:var(--warning)"></i> Prestado (S/) <span style="text-transform:none;letter-spacing:0;color:var(--warning);font-weight:400">(se registra como deuda tuya)</span></label>
+            <input id="compra-prestamo" type="number" step="0.01" min="0" value="0" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Ajuste Redondeo (S/)</label>
+            <input id="compra-redondeo" type="number" step="0.01" value="0" class="form-control">
+          </div>
+        </div>
+        <div class="form-group"><label>Descripción préstamo</label><input id="compra-prestamo-desc" class="form-control" placeholder="Opcional"></div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-compra">Cancelar</button>
-      <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-floppy-disk"></i> Registrar</button>
+      <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-check"></i> Registrar Compra</button>
     </div>
   </div>
 </div>
