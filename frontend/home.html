@@ -9,37 +9,42 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="home-body">
 
-<header class="home-header">
-  <div class="home-logo">
-    <div class="icon"><i class="fa-solid fa-store"></i></div>
-    <span>Tiendita Dulcecita</span>
+<!-- TOPBAR -->
+<header class="home-topbar">
+  <div class="home-topbar-logo">
+    <div class="logo-icon"><i class="fa-solid fa-store"></i></div>
+    <span>La Tiendita Dulcecita</span>
   </div>
-  <a href="/login" class="btn btn-outline" style="color:#94a3b8;border-color:#334155">
-    <i class="fa-solid fa-lock"></i> Admin
+  <a href="/login" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-right-to-bracket"></i> Ingresar
   </a>
 </header>
 
-<div class="home-search">
-  <div class="search-box" style="max-width:480px;position:relative">
-    <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
-    <input id="search-input" type="text" class="form-control" placeholder="Buscar productos..." style="padding-left:38px;border-radius:99px;width:100%">
+<!-- HERO -->
+<div class="home-hero">
+  <h1 class="home-hero-title">Nuestros Productos</h1>
+  <p class="home-hero-sub">Consulta nuestro catálogo y verifica disponibilidad de stock.</p>
+  <div class="home-hero-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input id="search-input" type="text" placeholder="Buscar producto..." autocomplete="off">
   </div>
 </div>
 
-<div style="padding:8px 24px 0;display:flex;align-items:center;justify-content:space-between">
-  <p id="count-label" style="font-size:13px;color:var(--text-muted)">Cargando productos...</p>
-  <button id="refresh-btn" class="btn btn-outline btn-sm">
-    <i class="fa-solid fa-rotate-right"></i> Actualizar
-  </button>
-</div>
-
-<div id="catalog" class="catalog-grid"></div>
-
-<div id="catalog-empty" class="hidden" style="text-align:center;padding:60px 20px;color:var(--text-muted)">
-  <i class="fa-solid fa-box-open" style="font-size:40px;margin-bottom:12px;display:block;opacity:.4"></i>
-  <p style="font-size:15px">No se encontraron productos</p>
+<!-- CATALOG -->
+<div class="home-catalog-wrap">
+  <div class="home-catalog-bar">
+    <span id="count-label" class="home-count-label">Cargando productos...</span>
+    <button id="refresh-btn" class="btn btn-outline btn-sm">
+      <i class="fa-solid fa-rotate-right"></i> Actualizar
+    </button>
+  </div>
+  <div id="catalog" class="catalog-grid"></div>
+  <div id="catalog-empty" class="hidden home-empty">
+    <i class="fa-solid fa-box-open"></i>
+    <p style="font-size:15px">No se encontraron productos</p>
+  </div>
 </div>
 
 <script src="js/config.js"></script>

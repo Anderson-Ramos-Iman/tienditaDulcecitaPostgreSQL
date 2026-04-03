@@ -137,10 +137,10 @@ tr:hover td { background: #f8fafc; }
 .stat-card .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 /* ── POS Cart ── */
-.pos-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; height: calc(100vh - var(--header-h) - 90px); }
-.pos-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.pos-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; height: calc(100vh - var(--header-h) - 48px); overflow: hidden; }
+.pos-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: hidden; }
 .pos-right { display: flex; flex-direction: column; gap: 0; }
-.products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; overflow-y: auto; flex: 1; padding-right: 4px; }
+.products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; overflow-y: auto; flex: 1; padding-right: 4px; align-content: start; }
 .product-card { background: #fff; border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; overflow: hidden; transition: all .15s; }
 .product-card:hover { border-color: var(--primary); box-shadow: 0 0 0 3px #dbeafe; }
 .product-card .product-img { width: 100%; height: 110px; object-fit: cover; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #cbd5e1; }
@@ -195,23 +195,65 @@ tr:hover td { background: #f8fafc; }
 .login-error { background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
 
 /* ── Home / Catalog ── */
-.home-header { background: #0f172a; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
-.home-logo { display: flex; align-items: center; gap: 10px; }
-.home-logo .icon { width: 36px; height: 36px; background: var(--primary); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.home-logo span { font-weight: 700; font-size: 16px; }
-.home-search { padding: 16px 24px; background: #fff; border-bottom: 1px solid var(--border); }
-.home-search input { width: 100%; max-width: 480px; padding: 10px 16px 10px 38px; border: 1.5px solid var(--border); border-radius: 99px; background: var(--bg); outline: none; }
-.home-search input:focus { border-color: var(--primary); background: #fff; }
-.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; padding: 20px 24px; }
-.catalog-card { background: #fff; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-.catalog-card .img-area { height: 160px; background: var(--bg); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-.catalog-card .img-area img { width: 100%; height: 160px; object-fit: cover; }
-.catalog-card .img-area i { font-size: 36px; color: #cbd5e1; }
-.catalog-card .card-body { padding: 12px 14px; }
-.catalog-card .card-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--text); }
+.home-body { background: #f1f5f9; min-height: 100vh; }
+.home-topbar { background: #0f172a; color: #fff; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+.home-topbar-logo { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 16px; color: #fff; }
+.home-topbar-logo .logo-icon { width: 36px; height: 36px; background: var(--primary); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; }
+.home-hero { background: #0f172a; color: #fff; text-align: center; padding: 52px 24px 52px; }
+.home-hero-title { font-size: 36px; font-weight: 800; color: #fff; margin-bottom: 10px; }
+.home-hero-sub { font-size: 15px; color: #94a3b8; margin-bottom: 28px; }
+.home-hero-search { max-width: 540px; margin: 0 auto; position: relative; background: #fff; border-radius: 99px; display: flex; align-items: center; padding: 0 20px; gap: 10px; }
+.home-hero-search i { color: #94a3b8; font-size: 15px; flex-shrink: 0; }
+.home-hero-search input { flex: 1; border: none; background: transparent; padding: 14px 0; font-size: 14px; outline: none; color: var(--text); width: 100%; }
+.home-catalog-wrap { padding: 22px 28px; }
+.home-catalog-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.home-count-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
+.catalog-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.07); transition: transform .15s, box-shadow .15s; }
+.catalog-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.catalog-card .img-area { height: 180px; background: #f8fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.catalog-card .img-area img { width: 100%; height: 100%; object-fit: cover; }
+.catalog-card .img-area i { font-size: 48px; color: #cbd5e1; }
+.catalog-card .card-body { padding: 14px 16px; }
+.catalog-card .card-name { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; line-height: 1.3; }
 .catalog-card .card-price { font-size: 18px; font-weight: 800; color: var(--primary); }
 .catalog-card .card-tipo { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .catalog-card .card-stock { margin-top: 8px; }
+.home-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.home-empty i { font-size: 44px; display: block; margin-bottom: 14px; opacity: .4; }
+
+/* ── Ventas filter card ── */
+.v-filters-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.v-filter-group { display: flex; flex-direction: column; gap: 4px; }
+.v-filter-group label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.v-filter-group .form-control { min-width: 110px; padding: 7px 10px; }
+.v-filter-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* ── Deudas – client cards ── */
+.debt-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.debt-client-card { background: #fff; border-radius: 12px; padding: 18px; border: 2px solid; box-shadow: var(--shadow); }
+.debt-client-card--red   { border-color: #fca5a5; }
+.debt-client-card--green { border-color: #86efac; }
+.debt-client-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.debt-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.debt-dot--red   { background: var(--danger); }
+.debt-dot--green { background: var(--success); }
+.debt-stat-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; color: var(--text-muted); }
+.debt-stat-row .val     { font-weight: 600; color: var(--text); }
+.debt-stat-row .val-red { font-weight: 700; color: var(--danger); }
+
+/* ── Deudas – detail view ── */
+.debt-section-header { display: flex; align-items: center; gap: 8px; padding: 8px 0; margin-bottom: 8px; }
+.debt-section-header strong { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.debt-item { background: #fff; border-radius: 10px; border: 1px solid var(--border); padding: 16px; margin-bottom: 10px; }
+.debt-item--pending { border-left: 3px solid var(--danger); }
+.debt-item--paid    { border-left: 3px solid var(--success); }
+.debt-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.debt-item-id { font-weight: 700; font-size: 14px; }
+.debt-item-stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; }
+.debt-item-stat label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: .04em; display: block; margin-bottom: 3px; }
+.debt-item-stat .val { font-weight: 700; font-size: 13px; }
+.debt-products-wrap { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
 
 /* ── Out-of-stock badge in POS ── */
 .product-card--agotado { opacity: .55; cursor: not-allowed; }
@@ -273,16 +315,24 @@ tr:hover td { background: #f8fafc; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
 
   /* Home catalog */
-  .home-search { padding: 12px 14px; }
-  .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); padding: 14px; gap: 12px; }
-  .catalog-card .img-area { height: 130px; }
-  .catalog-card .img-area img { height: 130px; }
+  .home-topbar { padding: 12px 14px; }
+  .home-hero { padding: 32px 16px 36px; }
+  .home-hero-title { font-size: 26px; }
+  .home-catalog-wrap { padding: 16px; }
+  .catalog-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .catalog-card .img-area { height: 140px; }
+
+  /* Ventas filter card */
+  .v-filters-card { gap: 8px; }
+  .v-filter-group .form-control { min-width: 90px; }
 }
 
 @media (max-width: 480px) {
-  .home-header { padding: 12px 14px; }
-  .home-logo span { font-size: 14px; }
-  .catalog-grid { grid-template-columns: repeat(2, 1fr); padding: 10px; gap: 10px; }
+  .home-topbar-logo span { font-size: 14px; }
+  .home-hero-title { font-size: 22px; }
+  .home-hero-sub { font-size: 13px; }
+  .home-catalog-wrap { padding: 10px; }
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .catalog-card .card-price { font-size: 16px; }
 
   .stats-grid { grid-template-columns: 1fr; }

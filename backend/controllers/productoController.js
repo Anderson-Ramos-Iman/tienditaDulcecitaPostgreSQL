@@ -3,9 +3,10 @@ const productoService = require('../services/productoService');
 class ProductoController {
   async getAll(req, res, next) {
     try {
-      const data = req.query.q
-        ? await productoService.buscar(req.query.q)
-        : await productoService.getAll();
+      let data;
+      if (req.query.q)        data = await productoService.buscar(req.query.q);
+      else if (req.query.all) data = await productoService.getAllForCompras();
+      else                    data = await productoService.getAll();
       res.json({ success: true, data });
     } catch (err) { next(err); }
   }

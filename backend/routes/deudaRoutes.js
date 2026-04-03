@@ -3,6 +3,7 @@ const ctrl = require('../controllers/deudaController');
 const { authMiddleware } = require('../middleware/auth');
 
 router.get('/',                        authMiddleware(['admin']), ctrl.getAll);
+router.get('/resumen',                 authMiddleware(['admin']), ctrl.getResumen);
 router.get('/cliente/:clienteId',      authMiddleware(['admin']), ctrl.getByCliente);
 router.get('/:id',                     authMiddleware(['admin']), ctrl.getById);
 router.post('/:id/pagar',              authMiddleware(['admin']), ctrl.registrarPago);

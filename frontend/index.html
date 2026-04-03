@@ -132,15 +132,22 @@
 
       <!-- ======================================================= VENTAS -->
       <div class="page" id="page-ventas">
-        <div class="page-header">
-          <h2>Historial de Ventas</h2>
-          <button class="btn btn-outline btn-sm" id="btn-export-ventas"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
-        </div>
-        <div class="filters-row">
-          <div class="form-group"><label>Desde</label><input type="date" id="v-fecha-ini" class="form-control"></div>
-          <div class="form-group"><label>Hasta</label><input type="date" id="v-fecha-fin" class="form-control"></div>
-          <div class="form-group">
-            <label>Tipo pago</label>
+        <div class="page-header"><h2>Ventas</h2></div>
+        <div class="v-filters-card">
+          <div class="v-filter-group">
+            <label>ID</label>
+            <input type="number" id="v-id" class="form-control" placeholder="#" style="width:72px">
+          </div>
+          <div class="v-filter-group">
+            <label>Desde</label>
+            <input type="date" id="v-fecha-ini" class="form-control">
+          </div>
+          <div class="v-filter-group">
+            <label>Hasta</label>
+            <input type="date" id="v-fecha-fin" class="form-control">
+          </div>
+          <div class="v-filter-group">
+            <label>Tipo de Pago</label>
             <select id="v-tipo" class="form-control">
               <option value="">Todos</option>
               <option value="efectivo">Efectivo</option>
@@ -150,15 +157,21 @@
               <option value="cortesia">Cortesía</option>
             </select>
           </div>
-          <div class="form-group" style="align-self:flex-end">
-            <button class="btn btn-primary" id="btn-filtrar-ventas"><i class="fa-solid fa-filter"></i> Filtrar</button>
+          <div class="v-filter-group">
+            <label>Cliente</label>
+            <select id="v-cliente" class="form-control"><option value="">Todos</option></select>
+          </div>
+          <div class="v-filter-actions">
+            <button class="btn btn-primary btn-sm" id="btn-filtrar-ventas"><i class="fa-solid fa-filter"></i> Filtrar</button>
+            <button class="btn btn-outline btn-sm" id="btn-limpiar-ventas"><i class="fa-solid fa-xmark"></i> Limpiar</button>
+            <button class="btn btn-outline btn-sm" id="btn-export-ventas"><i class="fa-solid fa-file-excel"></i> Excel</button>
           </div>
         </div>
         <div class="card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Efectivo</th><th>Yape</th><th>Total</th><th>Estado</th><th></th></tr></thead>
-              <tbody id="table-ventas"><tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+              <thead><tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Tipo Pago</th><th>Acciones</th></tr></thead>
+              <tbody id="table-ventas"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -265,27 +278,38 @@
 
       <!-- ======================================================= DEUDAS -->
       <div class="page" id="page-deudas">
-        <div class="page-header"><h2>Deudas</h2></div>
-        <div class="filters-row">
-          <div class="form-group">
-            <label>Estado</label>
-            <select id="d-estado" class="form-control">
-              <option value="">Todos</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="pagada">Pagada</option>
-            </select>
-          </div>
-          <div class="form-group" style="align-self:flex-end">
-            <button class="btn btn-primary" id="btn-filtrar-deudas"><i class="fa-solid fa-filter"></i> Filtrar</button>
+        <!-- ── VISTA TARJETAS POR CLIENTE ── -->
+        <div id="deuda-list-view">
+          <div class="page-header"><h2>Deudas</h2></div>
+          <div id="deuda-cards-container" class="debt-cards-grid">
+            <p style="color:var(--text-muted);padding:20px">Cargando...</p>
           </div>
         </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>#</th><th>Cliente</th><th>Total Deuda</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th></th></tr></thead>
-              <tbody id="table-deudas"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
-            </table>
+
+        <!-- ── VISTA DETALLE DE CLIENTE ── -->
+        <div id="deuda-detail-view" class="hidden">
+          <div class="card" style="padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <button class="btn btn-outline btn-sm" id="btn-volver-deudas"><i class="fa-solid fa-arrow-left"></i> Volver</button>
+              <span id="deuda-detail-title" style="font-weight:700;font-size:15px">Deudas del cliente</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" id="btn-share-whatsapp" style="background:#25d366;color:#fff"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+              <button class="btn btn-outline btn-sm" id="btn-share-pdf"><i class="fa-solid fa-file-pdf" style="color:var(--danger)"></i> PDF</button>
+            </div>
           </div>
+
+          <div class="debt-section-header">
+            <span class="debt-dot debt-dot--red"></span>
+            <strong id="deuda-pending-title">DEUDAS SIN PAGAR (0)</strong>
+          </div>
+          <div id="deuda-pending-list"></div>
+
+          <div class="debt-section-header" style="margin-top:14px">
+            <span class="debt-dot debt-dot--green"></span>
+            <strong id="deuda-paid-title">DEUDAS PAGADAS (0)</strong>
+          </div>
+          <div id="deuda-paid-list"></div>
         </div>
       </div>
 
@@ -462,6 +486,38 @@
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-compra">Cancelar</button>
       <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-check"></i> Registrar Compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logout Confirm Modal -->
+<div class="modal-overlay hidden" id="modal-logout-confirm">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-right-from-bracket" style="color:var(--danger);margin-right:8px"></i>Cerrar sesión</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0;color:var(--text-muted)">¿Estás seguro de que deseas cerrar sesión?</p>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" data-close="modal-logout-confirm">Cancelar</button>
+      <button class="btn btn-danger" id="btn-logout-confirm"><i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión</button>
+    </div>
+  </div>
+</div>
+
+<!-- Venta Detalle Modal -->
+<div class="modal-overlay hidden" id="modal-venta-detalle">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="venta-detalle-titulo">Detalle de Venta</h3>
+      <button class="modal-close" data-close="modal-venta-detalle">&times;</button>
+    </div>
+    <div class="modal-body" id="venta-detalle-body">
+      <p style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-venta-detalle">Cerrar</button>
     </div>
   </div>
 </div>

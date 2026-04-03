@@ -5,6 +5,10 @@ class ProductoService {
     return query(`SELECT * FROM productos WHERE activo = 1 OR activo IS NULL ORDER BY nombre`);
   }
 
+  async getAllForCompras() {
+    return query(`SELECT * FROM productos ORDER BY nombre`);
+  }
+
   async getById(id) {
     const rows = await query('SELECT * FROM productos WHERE id = $1', [id]);
     return rows[0] || null;

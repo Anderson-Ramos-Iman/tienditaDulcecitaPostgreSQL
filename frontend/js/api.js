@@ -31,13 +31,14 @@ const authAPI = {
 };
 
 const productosAPI = {
-  getAll:  (q = '')  => api.get(`/productos${q ? '?q='+encodeURIComponent(q) : ''}`),
-  getById: (id)      => api.get(`/productos/${id}`),
-  create:  (data)    => api.post('/productos', data),
-  update:  (id, data)=> api.put(`/productos/${id}`, data),
-  delete:  (id)      => api.delete(`/productos/${id}`),
-  getPromociones: (id)      => api.get(`/productos/${id}/promociones`),
-  createPromocion:(id, data)=> api.post(`/productos/${id}/promociones`, data)
+  getAll:          (q = '')  => api.get(`/productos${q ? '?q='+encodeURIComponent(q) : ''}`),
+  getAllForCompras: ()        => api.get('/productos?all=1'),
+  getById:         (id)      => api.get(`/productos/${id}`),
+  create:          (data)    => api.post('/productos', data),
+  update:          (id, data)=> api.put(`/productos/${id}`, data),
+  delete:          (id)      => api.delete(`/productos/${id}`),
+  getPromociones:  (id)      => api.get(`/productos/${id}/promociones`),
+  createPromocion: (id, data)=> api.post(`/productos/${id}/promociones`, data)
 };
 
 const clientesAPI = {
@@ -67,6 +68,7 @@ const deudasAPI = {
   getAll:       (params = '') => api.get(`/deudas?${params}`),
   getById:      (id)          => api.get(`/deudas/${id}`),
   getByCliente: (clienteId)   => api.get(`/deudas/cliente/${clienteId}`),
+  getResumen:   ()            => api.get('/deudas/resumen'),
   pagar:        (id, data)    => api.post(`/deudas/${id}/pagar`, data)
 };
 

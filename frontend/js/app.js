@@ -47,14 +47,18 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
    ============================================================ */
 const token = localStorage.getItem('token');
 const user  = JSON.parse(localStorage.getItem('user') || '{}');
-if (!token) { window.location.href = '/login'; }
+if (!token) { window.location.replace('/login'); }
 
 document.getElementById('user-name').textContent    = user.nombre || 'Admin';
 document.getElementById('user-initial').textContent = (user.nombre || 'A')[0].toUpperCase();
 
 document.getElementById('btn-logout').addEventListener('click', () => {
+  openModal('modal-logout-confirm');
+});
+
+document.getElementById('btn-logout-confirm').addEventListener('click', () => {
   localStorage.clear();
-  window.location.href = '/login';
+  window.location.replace('/login');
 });
 
 /* ============================================================
@@ -71,6 +75,7 @@ function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  localStorage.setItem('lastPage', page);
   if (PAGE_LOADERS[page]) PAGE_LOADERS[page]();
 }
 
@@ -269,7 +274,18 @@ async function loadClientesSelect() {
 const TIPO_PAGO_LABELS = { efectivo:'Efectivo', yape:'Yape', mixto:'Mixto', deuda:'Deuda', cortesia:'Cortesía' };
 let _allVentas = [];
 
-PAGE_LOADERS.ventas = () => loadVentas();
+PAGE_LOADERS.ventas = async () => {
+  loadVentas();
+  const sel = document.getElementById('v-cliente');
+  if (sel.options.length <= 1) {
+    try {
+      const r = await clientesAPI.getAll();
+      (r.data || []).forEach(c => {
+        const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; sel.appendChild(o);
+      });
+    } catch {}
+  }
+};
 
 async function loadVentas(params = '') {
   try {
@@ -279,24 +295,83 @@ async function loadVentas(params = '') {
   } catch (e) { showErr(e.message); }
 }
 
+function renderTipoPagoCell(v) {
+  if (v.tipo_pago === 'efectivo') return '<span class="chip chip-success">Efectivo</span>';
+  if (v.tipo_pago === 'yape')     return '<span class="chip chip-primary" style="background:#cffafe;color:#0e7490">Yape</span>';
+  if (v.tipo_pago === 'mixto')    return '<span class="chip chip-warning">Mixto</span>';
+  if (v.tipo_pago === 'cortesia') return '<span class="chip chip-secondary">Cortesía</span>';
+  if (v.tipo_pago === 'deuda') {
+    const pagado   = parseFloat(v.deuda_pagado  || 0);
+    const total_d  = parseFloat(v.deuda_total   || v.total || 0);
+    const pendiente = Math.max(0, total_d - pagado);
+    const pagada    = v.deuda_estado === 'pagada' || pendiente < 0.01;
+    const sub = pagada
+      ? `<div style="font-size:10px;color:var(--success);margin-top:3px"><i class="fa-solid fa-check"></i> Pagada</div>`
+      : `<div style="font-size:10px;color:#f59e0b;margin-top:3px">● Pendiente (${fmt(pendiente)})</div>`;
+    return `<span class="chip chip-danger">Deuda</span>${sub}`;
+  }
+  return `<span class="chip chip-secondary">${v.tipo_pago}</span>`;
+}
+
 function renderVentas(list) {
   const tbody = document.getElementById('table-ventas');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-muted)">Sin resultados</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Sin resultados</td></tr>'; return; }
   tbody.innerHTML = list.map(v => {
     const anulada = v.estado === 'anulada';
-    const tipoBadge = { efectivo:'chip-success', yape:'chip-primary', mixto:'chip-warning', deuda:'chip-danger', cortesia:'chip-secondary' }[v.tipo_pago] || 'chip-secondary';
-    return `<tr style="${anulada ? 'opacity:.5;text-decoration:line-through' : ''}">
-      <td>${v.id}</td>
-      <td style="white-space:nowrap">${fmtDate(v.fecha)}</td>
-      <td>${v.cliente_nombre || 'Público'}</td>
-      <td><span class="chip ${tipoBadge}">${TIPO_PAGO_LABELS[v.tipo_pago] || v.tipo_pago}</span></td>
-      <td>${fmt(v.monto_efectivo)}</td>
-      <td>${fmt(v.monto_yape)}</td>
+    const clienteHtml = v.cliente_nombre
+      ? `<span style="color:var(--primary);font-weight:500">${v.cliente_nombre}</span>`
+      : `<span style="color:var(--text-muted)">Sin cliente</span>`;
+    return `<tr style="${anulada ? 'opacity:.5' : ''}">
+      <td><strong style="color:var(--text)">#${v.id}</strong></td>
+      <td style="white-space:nowrap;color:var(--text-muted)">${fmtDate(v.fecha)}</td>
+      <td>${clienteHtml}</td>
       <td><strong>${fmt(v.total)}</strong></td>
-      <td>${anulada ? '<span class="chip chip-danger">Anulada</span>' : '<span class="chip chip-success">Activa</span>'}</td>
-      <td>${!anulada ? `<button class="btn btn-danger btn-sm" onclick="anularVenta(${v.id})"><i class="fa-solid fa-ban"></i></button>` : ''}</td>
+      <td>${renderTipoPagoCell(v)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" title="Ver detalle" onclick="verDetalleVenta(${v.id})"><i class="fa-solid fa-eye"></i></button>
+          ${!anulada ? `<button class="btn btn-danger btn-sm" title="Anular venta" onclick="anularVenta(${v.id})"><i class="fa-solid fa-ban"></i></button>` : `<span class="chip chip-danger" style="font-size:10px">Anulada</span>`}
+        </div>
+      </td>
     </tr>`;
   }).join('');
+}
+
+async function verDetalleVenta(id) {
+  openModal('modal-venta-detalle');
+  document.getElementById('venta-detalle-titulo').textContent = `Venta #${id}`;
+  const body = document.getElementById('venta-detalle-body');
+  body.innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</p>';
+  try {
+    const res  = await ventasAPI.getById(id);
+    const v    = res.data;
+    const dets = v.detalles || [];
+    body.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:18px;padding:14px;background:var(--bg);border-radius:10px">
+        <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Fecha</div><div>${fmtDate(v.fecha)}</div></div>
+        <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Cliente</div><div>${v.cliente_nombre || 'Sin cliente'}</div></div>
+        <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Tipo Pago</div><div>${TIPO_PAGO_LABELS[v.tipo_pago] || v.tipo_pago}</div></div>
+        <div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Total</div><div style="font-weight:800;font-size:18px;color:var(--primary)">${fmt(v.total)}</div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Producto</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Precio Unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
+            <tbody>
+              ${dets.length ? dets.map(d => `
+                <tr>
+                  <td>${d.producto_nombre}${d.es_bonificacion ? ' <span class="chip chip-warning" style="font-size:10px">Bonif.</span>' : ''}</td>
+                  <td style="text-align:center">${d.cantidad}</td>
+                  <td style="text-align:right">${fmt(d.precio_unitario)}</td>
+                  <td style="text-align:right"><strong>${fmt(d.cantidad * parseFloat(d.precio_unitario))}</strong></td>
+                </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-muted)">Sin detalle</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    body.innerHTML = `<p style="color:var(--danger);text-align:center;padding:20px">${e.message}</p>`;
+  }
 }
 
 async function anularVenta(id) {
@@ -307,14 +382,31 @@ async function anularVenta(id) {
 }
 
 document.getElementById('btn-filtrar-ventas').addEventListener('click', () => {
-  const fi = document.getElementById('v-fecha-ini').value;
-  const ff = document.getElementById('v-fecha-fin').value;
-  const t  = document.getElementById('v-tipo').value;
-  const p  = new URLSearchParams();
-  if (fi) p.set('fecha_inicio', fi);
-  if (ff) p.set('fecha_fin', ff);
-  if (t)  p.set('tipo_pago', t);
-  loadVentas(p.toString());
+  const fi  = document.getElementById('v-fecha-ini').value;
+  const ff  = document.getElementById('v-fecha-fin').value;
+  const t   = document.getElementById('v-tipo').value;
+  const cli = document.getElementById('v-cliente').value;
+  const vid = document.getElementById('v-id').value;
+  const p   = new URLSearchParams();
+  if (fi)  p.set('fecha_inicio', fi);
+  if (ff)  p.set('fecha_fin', ff);
+  if (t)   p.set('tipo_pago', t);
+  if (cli) p.set('cliente_id', cli);
+  loadVentas(p.toString()).then(() => {
+    if (vid) {
+      const id = parseInt(vid);
+      renderVentas(_allVentas.filter(v => v.id === id));
+    }
+  });
+});
+
+document.getElementById('btn-limpiar-ventas').addEventListener('click', () => {
+  document.getElementById('v-id').value        = '';
+  document.getElementById('v-fecha-ini').value = '';
+  document.getElementById('v-fecha-fin').value = '';
+  document.getElementById('v-tipo').value      = '';
+  document.getElementById('v-cliente').value   = '';
+  loadVentas();
 });
 
 document.getElementById('btn-export-ventas').addEventListener('click', () => exportVentasExcel());
@@ -498,16 +590,16 @@ async function abrirModalCompra() {
   document.getElementById('compra-total-calc').textContent = 'S/ 0.00';
 
   const sel = document.getElementById('compra-add-prod');
-  if (sel.options.length <= 1) {
-    try {
-      const r = await productosAPI.getAll();
-      (r.data || []).forEach(p => {
-        const o = document.createElement('option');
-        o.value = p.id; o.textContent = p.nombre;
-        sel.appendChild(o);
-      });
-    } catch {}
-  }
+  while (sel.options.length > 1) sel.remove(1);
+  try {
+    const r = await productosAPI.getAllForCompras();
+    (r.data || []).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.id;
+      o.textContent = p.nombre + (p.activo == 0 ? ' (inactivo)' : '');
+      sel.appendChild(o);
+    });
+  } catch {}
   openModal('modal-compra');
 }
 
@@ -767,58 +859,267 @@ document.getElementById('btn-confirmar-ajuste').addEventListener('click', async 
 /* ============================================================
    DEUDAS
    ============================================================ */
-PAGE_LOADERS.deudas = () => loadDeudas();
+let _currentDeudaClienteId   = null;
+let _currentDeudaClienteNom  = '';
+let _currentDeudaClienteTel  = '';
 
-async function loadDeudas(params = '') {
+PAGE_LOADERS.deudas = () => loadDeudasResumen();
+
+async function loadDeudasResumen() {
   try {
-    const res = await deudasAPI.getAll(params);
-    renderDeudas(res.data || []);
+    const res = await deudasAPI.getResumen();
+    renderDeudasClientes(res.data || []);
   } catch (e) { showErr(e.message); }
 }
 
-function renderDeudas(list) {
-  const tbody = document.getElementById('table-deudas');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Sin deudas</td></tr>'; return; }
-  tbody.innerHTML = list.map(d => {
-    const pagado  = parseFloat(d.total_pagado || 0);
-    const total   = parseFloat(d.total_pendiente || 0);
-    const saldo   = total - pagado;
-    return `<tr>
-      <td>${d.id}</td>
-      <td><strong>${d.cliente_nombre}</strong><br><small style="color:var(--text-muted)">${d.cliente_telefono||''}</small></td>
-      <td>${fmt(total)}</td>
-      <td>${fmt(pagado)}</td>
-      <td><strong ${saldo > 0 ? 'style="color:var(--danger)"' : ''}>${fmt(saldo)}</strong></td>
-      <td><span class="chip ${d.estado==='pagada'?'chip-success':'chip-warning'}">${d.estado==='pagada'?'Pagada':'Pendiente'}</span></td>
-      <td>${d.estado!=='pagada'?`<button class="btn btn-primary btn-sm" onclick="abrirPagoDeuda(${d.id},'${d.cliente_nombre}',${saldo})"><i class="fa-solid fa-money-bill"></i> Pagar</button>`:''}</td>
-    </tr>`;
+function renderDeudasClientes(list) {
+  const grid = document.getElementById('deuda-cards-container');
+  if (!list.length) {
+    grid.innerHTML = '<p style="color:var(--text-muted);padding:20px">Sin clientes con deudas registradas.</p>';
+    return;
+  }
+  grid.innerHTML = list.map(c => {
+    const total      = parseFloat(c.deuda_total  || 0);
+    const pagado     = parseFloat(c.total_pagado || 0);
+    const saldo      = Math.max(0, total - pagado);
+    const tieneDeuda = parseInt(c.deudas_pendientes) > 0;
+    const cls  = tieneDeuda ? 'debt-client-card--red'   : 'debt-client-card--green';
+    const dot  = tieneDeuda ? 'debt-dot--red'           : 'debt-dot--green';
+    const nom  = (c.cliente_nombre  || '').replace(/'/g, "\\'");
+    const tel  = (c.cliente_telefono|| '').replace(/'/g, "\\'");
+    return `
+      <div class="debt-client-card ${cls}">
+        <div class="debt-client-name">
+          <span class="debt-dot ${dot}"></span>${c.cliente_nombre}
+        </div>
+        <div class="debt-stat-row"><span>Deuda total</span><span class="val">${fmt(total)}</span></div>
+        <div class="debt-stat-row"><span>Pagado</span><span class="val">${fmt(pagado)}</span></div>
+        <div class="debt-stat-row"><span>Saldo</span><span class="${tieneDeuda ? 'val val-red' : 'val'}">${fmt(saldo)}</span></div>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${parseInt(c.total_deudas) > 0
+            ? `<button class="btn btn-outline btn-sm" onclick="verDetalleCliente(${c.cliente_id},'${nom}','${tel}')">→ Ver detalle</button>`
+            : ''}
+          ${!tieneDeuda
+            ? `<span style="font-size:12px;color:var(--success)"><i class="fa-solid fa-circle-check"></i> Sin deuda pendiente</span>`
+            : ''}
+        </div>
+      </div>`;
   }).join('');
 }
 
-document.getElementById('btn-filtrar-deudas').addEventListener('click', () => {
-  const p = new URLSearchParams();
-  const e = document.getElementById('d-estado').value;
-  if (e) p.set('estado', e);
-  loadDeudas(p.toString());
-});
+async function verDetalleCliente(clienteId, nombre, telefono) {
+  _currentDeudaClienteId  = clienteId;
+  _currentDeudaClienteNom = nombre;
+  _currentDeudaClienteTel = telefono || '';
+  document.getElementById('deuda-detail-title').textContent = `Deudas del cliente - ${nombre}`;
+  document.getElementById('deuda-list-view').classList.add('hidden');
+  document.getElementById('deuda-detail-view').classList.remove('hidden');
+  await cargarDetalleCliente(clienteId);
+}
 
-function abrirPagoDeuda(id, nombre, saldo) {
+async function cargarDetalleCliente(clienteId) {
+  document.getElementById('deuda-pending-list').innerHTML = '<p style="color:var(--text-muted);padding:10px">Cargando...</p>';
+  document.getElementById('deuda-paid-list').innerHTML = '';
+  try {
+    const res       = await deudasAPI.getByCliente(clienteId);
+    const deudas    = res.data || [];
+    const pendientes = deudas.filter(d => d.estado === 'pendiente');
+    const pagadas    = deudas.filter(d => d.estado === 'pagada');
+    document.getElementById('deuda-pending-title').textContent = `DEUDAS SIN PAGAR (${pendientes.length})`;
+    document.getElementById('deuda-paid-title').textContent    = `DEUDAS PAGADAS (${pagadas.length})`;
+    document.getElementById('deuda-pending-list').innerHTML    = pendientes.length
+      ? pendientes.map(d => renderDeudaItem(d, false)).join('')
+      : '<p style="color:var(--text-muted);font-size:13px;padding:6px 0">No hay deudas pendientes.</p>';
+    document.getElementById('deuda-paid-list').innerHTML = pagadas.length
+      ? pagadas.map(d => renderDeudaItem(d, true)).join('')
+      : '<p style="color:var(--text-muted);font-size:13px;padding:6px 0">No hay deudas pagadas.</p>';
+  } catch (e) { showErr(e.message); }
+}
+
+function renderDeudaItem(d, esPagada) {
+  const total   = parseFloat(d.total_pendiente || 0);
+  const pagado  = parseFloat(d.total_pagado    || 0);
+  const saldo   = Math.max(0, total - pagado);
+  const numProd = parseInt(d.num_productos || 0);
+  const fechaStr = d.venta_fecha
+    ? new Date(d.venta_fecha).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' })
+    : '';
+  return `
+    <div class="debt-item ${esPagada ? 'debt-item--paid' : 'debt-item--pending'}" id="debt-item-${d.id}">
+      <div class="debt-item-header">
+        <span class="debt-item-id">Deuda #${d.id}</span>
+        <span class="chip ${esPagada ? 'chip-success' : 'chip-danger'}" style="font-size:10px">${esPagada ? 'pagado' : 'pendiente'}</span>
+        ${fechaStr && esPagada ? `<span style="margin-left:auto;font-size:12px;color:var(--text-muted)"><i class="fa-regular fa-calendar"></i> ${fechaStr}</span>` : ''}
+      </div>
+      ${numProd > 0 ? `
+        <button class="btn btn-outline btn-sm" style="margin-bottom:8px" onclick="toggleVerProductos(${d.id},${d.venta_id})">
+          <i class="fa-solid fa-basket-shopping"></i> Ver productos (${numProd})
+        </button>
+        <div id="prods-${d.id}" class="hidden debt-products-wrap"></div>` : ''}
+      <div class="debt-item-stats">
+        <div class="debt-item-stat"><label>Total deuda</label><span class="val">${fmt(total)}</span></div>
+        <div class="debt-item-stat"><label>Pagado</label><span class="val" style="color:var(--success)">${fmt(pagado)}</span></div>
+        <div class="debt-item-stat"><label>Saldo</label><span class="val" style="color:${saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(saldo)}</span></div>
+      </div>
+      <div style="margin-top:12px">
+        ${!esPagada
+          ? `<button class="btn btn-primary btn-sm" onclick="abrirPagoDeuda(${d.id},${saldo})"><i class="fa-solid fa-money-bill-wave"></i> Registrar Pago</button>`
+          : `<span style="font-size:12px;color:var(--success)"><i class="fa-solid fa-circle-check"></i> Completamente pagada</span>`}
+      </div>
+    </div>`;
+}
+
+async function toggleVerProductos(deudaId, ventaId) {
+  const box = document.getElementById(`prods-${deudaId}`);
+  if (!box) return;
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  if (box.dataset.loaded) return;
+  box.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:4px 0">Cargando productos...</p>';
+  try {
+    const res  = await ventasAPI.getById(ventaId);
+    const dets = (res.data || {}).detalles || [];
+    box.dataset.loaded = '1';
+    box.innerHTML = dets.length ? `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f8fafc">
+          <th style="padding:6px 10px;text-align:left;color:var(--text-muted);font-weight:600">Producto</th>
+          <th style="padding:6px 10px;text-align:center;color:var(--text-muted);font-weight:600">Cant.</th>
+          <th style="padding:6px 10px;text-align:right;color:var(--text-muted);font-weight:600">Precio Unit.</th>
+          <th style="padding:6px 10px;text-align:right;color:var(--text-muted);font-weight:600">Subtotal</th>
+        </tr></thead>
+        <tbody>${dets.map(d => `
+          <tr style="border-top:1px solid var(--border)">
+            <td style="padding:6px 10px">${d.producto_nombre}${d.es_bonificacion ? ' <span class="chip chip-warning" style="font-size:9px">Bonif.</span>' : ''}</td>
+            <td style="padding:6px 10px;text-align:center">${d.cantidad}</td>
+            <td style="padding:6px 10px;text-align:right">${fmt(d.precio_unitario)}</td>
+            <td style="padding:6px 10px;text-align:right"><strong>${fmt(d.cantidad * parseFloat(d.precio_unitario))}</strong></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+      : '<p style="color:var(--text-muted);font-size:12px">Sin productos registrados.</p>';
+  } catch (e) { box.innerHTML = `<p style="color:var(--danger);font-size:12px">${e.message}</p>`; }
+}
+
+function abrirPagoDeuda(id, saldo) {
   document.getElementById('pago-deuda-id').value = id;
-  document.getElementById('pago-deuda-info').textContent = `Cliente: ${nombre} — Saldo pendiente: ${fmt(saldo)}`;
+  document.getElementById('pago-deuda-info').textContent = `Cliente: ${_currentDeudaClienteNom} — Saldo pendiente: ${fmt(saldo)}`;
   document.getElementById('pago-efectivo').value = '0';
   document.getElementById('pago-yape').value = '0';
   openModal('modal-pagar-deuda');
 }
 
 document.getElementById('btn-confirmar-pago').addEventListener('click', async () => {
-  const id = document.getElementById('pago-deuda-id').value;
+  const id   = document.getElementById('pago-deuda-id').value;
   const data = {
     monto_efectivo: parseFloat(document.getElementById('pago-efectivo').value) || 0,
     monto_yape:     parseFloat(document.getElementById('pago-yape').value) || 0
   };
   if (!data.monto_efectivo && !data.monto_yape) { showWarn('Ingresa al menos un monto'); return; }
-  try { await deudasAPI.pagar(id, data); showOk('Pago registrado'); closeModal('modal-pagar-deuda'); loadDeudas(); loadCaja(); }
-  catch (e) { showErr(e.message); }
+  try {
+    await deudasAPI.pagar(id, data);
+    showOk('Pago registrado');
+    closeModal('modal-pagar-deuda');
+    if (_currentDeudaClienteId) {
+      await cargarDetalleCliente(_currentDeudaClienteId);
+      loadDeudasResumen();
+    }
+    loadCaja();
+  } catch (e) { showErr(e.message); }
+});
+
+document.getElementById('btn-volver-deudas').addEventListener('click', () => {
+  document.getElementById('deuda-detail-view').classList.add('hidden');
+  document.getElementById('deuda-list-view').classList.remove('hidden');
+});
+
+document.getElementById('btn-share-whatsapp').addEventListener('click', async () => {
+  if (!_currentDeudaClienteId) return;
+  try {
+    const res        = await deudasAPI.getByCliente(_currentDeudaClienteId);
+    const pendientes = (res.data || []).filter(d => d.estado === 'pendiente');
+    if (!pendientes.length) { showWarn('No hay deudas pendientes para compartir'); return; }
+    const totalSaldo = pendientes.reduce((s, d) => s + Math.max(0, parseFloat(d.total_pendiente) - parseFloat(d.total_pagado)), 0);
+    const lines = pendientes.map(d => {
+      const sal = Math.max(0, parseFloat(d.total_pendiente) - parseFloat(d.total_pagado));
+      return `• Deuda #${d.id}: S/ ${sal.toFixed(2)} pendiente`;
+    });
+    const msg  = `*Deudas pendientes - ${_currentDeudaClienteNom}*\n\n${lines.join('\n')}\n\n*Total pendiente: S/ ${totalSaldo.toFixed(2)}*`;
+    const tel  = _currentDeudaClienteTel.replace(/\D/g, '');
+    const url  = tel ? `https://wa.me/51${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  } catch (e) { showErr(e.message); }
+});
+
+document.getElementById('btn-share-pdf').addEventListener('click', async () => {
+  if (!_currentDeudaClienteId) return;
+  try {
+    const res        = await deudasAPI.getByCliente(_currentDeudaClienteId);
+    const pendientes = (res.data || []).filter(d => d.estado === 'pendiente');
+    if (!pendientes.length) { showWarn('No hay deudas pendientes para exportar'); return; }
+
+    const ventasDetalle = await Promise.all(
+      pendientes.map(d => d.venta_id ? ventasAPI.getById(d.venta_id).catch(() => null) : Promise.resolve(null))
+    );
+
+    const totalSaldo = pendientes.reduce((s, d) => s + Math.max(0, parseFloat(d.total_pendiente) - parseFloat(d.total_pagado)), 0);
+
+    const sections = pendientes.map((d, i) => {
+      const sal   = Math.max(0, parseFloat(d.total_pendiente) - parseFloat(d.total_pagado));
+      const dets  = ventasDetalle[i]?.data?.detalles || [];
+      const prodsRows = dets.length
+        ? dets.map(p => `<tr>
+            <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9">${p.producto_nombre}${p.es_bonificacion ? ' (Bonif.)' : ''}</td>
+            <td style="padding:5px 10px;text-align:center;border-bottom:1px solid #f1f5f9">${p.cantidad}</td>
+            <td style="padding:5px 10px;text-align:right;border-bottom:1px solid #f1f5f9">S/ ${parseFloat(p.precio_unitario).toFixed(2)}</td>
+            <td style="padding:5px 10px;text-align:right;border-bottom:1px solid #f1f5f9">S/ ${(p.cantidad * parseFloat(p.precio_unitario)).toFixed(2)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="4" style="padding:6px 10px;color:#94a3b8;font-style:italic">Sin detalle de productos</td></tr>`;
+      return `
+        <div style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+          <div style="background:#f8fafc;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700;font-size:14px">Deuda #${d.id}</span>
+            <span style="color:#dc2626;font-weight:700">Saldo: S/ ${sal.toFixed(2)}</span>
+          </div>
+          <div style="padding:10px 14px;font-size:12px;color:#64748b;display:flex;gap:24px;border-bottom:1px solid #f1f5f9">
+            <span>Total: S/ ${parseFloat(d.total_pendiente).toFixed(2)}</span>
+            <span>Pagado: S/ ${parseFloat(d.total_pagado).toFixed(2)}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#f8fafc">
+              <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600">Producto</th>
+              <th style="padding:6px 10px;text-align:center;color:#64748b;font-weight:600">Cant.</th>
+              <th style="padding:6px 10px;text-align:right;color:#64748b;font-weight:600">P. Unit.</th>
+              <th style="padding:6px 10px;text-align:right;color:#64748b;font-weight:600">Subtotal</th>
+            </tr></thead>
+            <tbody>${prodsRows}</tbody>
+          </table>
+        </div>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Deudas – ${_currentDeudaClienteNom}</title>
+      <style>
+        body{font-family:Arial,sans-serif;padding:30px;color:#1e293b;max-width:700px;margin:0 auto}
+        h1{font-size:20px;margin-bottom:4px}
+        p.sub{color:#64748b;font-size:13px;margin-bottom:20px}
+        .total-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;margin-top:20px;display:flex;justify-content:space-between;align-items:center}
+        .total-box span:last-child{font-size:18px;font-weight:800;color:#dc2626}
+        @media print{body{padding:15px}}
+      </style></head><body>
+      <h1>Deudas pendientes</h1>
+      <p class="sub">Cliente: <strong>${_currentDeudaClienteNom}</strong> &nbsp;|&nbsp; Fecha: ${new Date().toLocaleDateString('es-PE')}</p>
+      ${sections}
+      <div class="total-box">
+        <span style="font-weight:600">Total pendiente</span>
+        <span>S/ ${totalSaldo.toFixed(2)}</span>
+      </div>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
+  } catch (e) { showErr(e.message); }
 });
 
 /* ============================================================
@@ -836,18 +1137,64 @@ async function loadPrestamos() {
 function renderPrestamos(list) {
   const tbody = document.getElementById('table-prestamos');
   if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted)">Sin préstamos</td></tr>'; return; }
-  tbody.innerHTML = list.map(p => `
-    <tr>
+  tbody.innerHTML = list.map(p => {
+    const compraMatch = p.descripcion.match(/Compra #(\d+)/i);
+    const compraId    = compraMatch ? parseInt(compraMatch[1]) : null;
+    return `
+    <tr id="prestamo-row-${p.id}">
       <td>${p.id}</td>
       <td>${p.descripcion}</td>
       <td><strong>${fmt(p.monto)}</strong></td>
       <td style="white-space:nowrap">${fmtDate(p.fecha)}</td>
       <td><span class="chip ${p.estado==='devuelto'?'chip-success':'chip-warning'}">${p.estado==='devuelto'?'Devuelto':'Pendiente'}</span></td>
       <td style="display:flex;gap:6px">
+        ${compraId ? `<button class="btn btn-outline btn-sm" title="Ver detalle de compra" onclick="toggleCompraDetalle(${p.id},${compraId})"><i class="fa-solid fa-eye"></i></button>` : ''}
         ${p.estado!=='devuelto'?`<button class="btn btn-success btn-sm" onclick="devolverPrestamo(${p.id})"><i class="fa-solid fa-check"></i></button>`:''}
         <button class="btn btn-danger btn-sm" onclick="eliminarPrestamo(${p.id})"><i class="fa-solid fa-trash"></i></button>
       </td>
-    </tr>`).join('');
+    </tr>
+    <tr id="prestamo-detail-${p.id}" class="hidden">
+      <td colspan="6" style="padding:0;background:#f8fafc;border-bottom:1px solid var(--border)">
+        <div id="prestamo-detail-body-${p.id}" style="padding:14px 20px"></div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function toggleCompraDetalle(prestamoId, compraId) {
+  const detailRow = document.getElementById(`prestamo-detail-${prestamoId}`);
+  if (!detailRow.classList.contains('hidden')) { detailRow.classList.add('hidden'); return; }
+  detailRow.classList.remove('hidden');
+  const body = document.getElementById(`prestamo-detail-body-${prestamoId}`);
+  if (body.dataset.loaded) return;
+  body.innerHTML = '<p style="color:var(--text-muted);font-size:12px"><i class="fa-solid fa-spinner fa-spin"></i> Cargando detalle...</p>';
+  try {
+    const res  = await comprasAPI.getById(compraId);
+    const dets = (res.data || {}).detalles || [];
+    body.dataset.loaded = '1';
+    body.innerHTML = `
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;letter-spacing:.04em">
+        Detalle de Compra #${compraId}
+      </div>` +
+      (dets.length ? `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#f1f5f9">
+          <th style="padding:6px 10px;text-align:left;color:var(--text-muted);font-weight:600">Producto</th>
+          <th style="padding:6px 10px;text-align:center;color:var(--text-muted);font-weight:600">Cant.</th>
+          <th style="padding:6px 10px;text-align:right;color:var(--text-muted);font-weight:600">Precio Unit.</th>
+          <th style="padding:6px 10px;text-align:right;color:var(--text-muted);font-weight:600">Subtotal</th>
+        </tr></thead>
+        <tbody>${dets.map(d => `
+          <tr style="border-top:1px solid var(--border)">
+            <td style="padding:6px 10px">${d.producto_nombre}${d.es_bonificacion ? ' <span class="chip chip-warning" style="font-size:9px">Bonif.</span>' : ''}</td>
+            <td style="padding:6px 10px;text-align:center">${d.cantidad}</td>
+            <td style="padding:6px 10px;text-align:right">${fmt(d.precio_unitario)}</td>
+            <td style="padding:6px 10px;text-align:right"><strong>${fmt(d.cantidad * parseFloat(d.precio_unitario))}</strong></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+      : '<p style="color:var(--text-muted);font-size:12px">Sin productos registrados.</p>');
+  } catch (e) { body.innerHTML = `<p style="color:var(--danger);font-size:12px">${e.message}</p>`; }
 }
 
 document.getElementById('btn-nuevo-prestamo').addEventListener('click', () => {
@@ -981,4 +1328,8 @@ document.querySelectorAll('.nav-item[data-page]').forEach(item => {
 /* ============================================================
    INIT
    ============================================================ */
-PAGE_LOADERS.pos();
+const _savedPage = localStorage.getItem('lastPage');
+navigateTO: {
+  const validPages = Object.keys(PAGE_TITLES);
+  navigateTo(validPages.includes(_savedPage) ? _savedPage : 'pos');
+}

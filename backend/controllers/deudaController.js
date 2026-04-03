@@ -19,6 +19,11 @@ class DeudaController {
     catch (err) { next(err); }
   }
 
+  async getResumen(req, res, next) {
+    try { res.json({ success: true, data: await deudaService.getResumenPorCliente() }); }
+    catch (err) { next(err); }
+  }
+
   async registrarPago(req, res, next) {
     try { res.json({ success: true, data: await deudaService.registrarPago({ deuda_id: req.params.id, ...req.body }) }); }
     catch (err) { next(err); }

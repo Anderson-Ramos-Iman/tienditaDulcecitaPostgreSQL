@@ -27,8 +27,30 @@ class DeudaService {
   async getByCliente(clienteId) {
     return query(`
       SELECT d.*,
-             COALESCE((SELECT SUM(p.monto_total) FROM pagos_deuda p WHERE p.deuda_id = d.id), 0) AS total_pagado
-      FROM deudas d WHERE d.cliente_id = $1 ORDER BY d.id DESC`, [clienteId]);
+             v.fecha AS venta_fecha,
+             COALESCE((SELECT SUM(p.monto_total) FROM pagos_deuda p WHERE p.deuda_id = d.id), 0) AS total_pagado,
+             COALESCE((SELECT COUNT(*) FROM detalle_venta dv WHERE dv.venta_id = d.venta_id), 0) AS num_productos
+      FROM deudas d
+      LEFT JOIN ventas v ON v.id = d.venta_id
+      WHERE d.cliente_id = $1 ORDER BY d.id DESC`, [clienteId]);
+  }
+
+  async getResumenPorCliente() {
+    return query(`
+      SELECT
+        c.id   AS cliente_id,
+        c.nombre AS cliente_nombre,
+        c.telefono AS cliente_telefono,
+        COUNT(d.id) AS total_deudas,
+        COALESCE(SUM(d.total_pendiente), 0) AS deuda_total,
+        COALESCE(SUM(
+          COALESCE((SELECT SUM(p.monto_total) FROM pagos_deuda p WHERE p.deuda_id = d.id), 0)
+        ), 0) AS total_pagado,
+        COUNT(CASE WHEN d.estado = 'pendiente' THEN 1 END) AS deudas_pendientes
+      FROM clientes c
+      LEFT JOIN deudas d ON d.cliente_id = c.id
+      GROUP BY c.id, c.nombre, c.telefono
+      ORDER BY COUNT(CASE WHEN d.estado = 'pendiente' THEN 1 END) DESC, c.nombre ASC`);
   }
 
   async registrarPago(data) {
