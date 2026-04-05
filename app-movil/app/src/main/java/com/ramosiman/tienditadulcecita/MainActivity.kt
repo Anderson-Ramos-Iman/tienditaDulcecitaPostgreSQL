@@ -9,9 +9,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.ramosiman.tienditadulcecita.data.Categoria
 import com.ramosiman.tienditadulcecita.data.Producto
 import com.ramosiman.tienditadulcecita.ui.theme.TienditaDulcecitaTheme
 
@@ -60,9 +64,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CatalogoScreen(vm: CatalogoViewModel = viewModel()) {
-    val uiState     by vm.uiState.collectAsState()
-    val search      by vm.searchQuery.collectAsState()
-    val soloStock   by vm.soloConStock.collectAsState()
+    val uiState          by vm.uiState.collectAsState()
+    val search           by vm.searchQuery.collectAsState()
+    val soloStock        by vm.soloConStock.collectAsState()
+    val categorias       by vm.categorias.collectAsState()
+    val activeCatId      by vm.activeCategoriaId.collectAsState()
+    val currentPage      by vm.currentPage.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(ColorBg)) {
 
@@ -118,7 +125,7 @@ fun CatalogoScreen(vm: CatalogoViewModel = viewModel()) {
             Spacer(Modifier.width(8.dp))
             BasicTextField(
                 value = search,
-                onValueChange = { vm.searchQuery.value = it },
+                onValueChange = { vm.searchQuery.value = it; vm.irAPagina(1) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 decorationBox = { inner ->
@@ -127,6 +134,27 @@ fun CatalogoScreen(vm: CatalogoViewModel = viewModel()) {
                 },
                 textStyle = androidx.compose.ui.text.TextStyle(color = ColorText, fontSize = 14.sp)
             )
+        }
+
+        /* ── CATEGORY CHIPS ── */
+        if (categorias.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ColorSurface)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                lazyItems(listOf(null) + categorias.map { it.id as Int? }) { id ->
+                    val cat = if (id == null) null else categorias.find { it.id == id }
+                    val label = if (cat == null) "Todas" else "${cat.icono ?: ""} ${cat.nombre}"
+                    FilterChipItem(
+                        label = label,
+                        active = id == activeCatId,
+                        onClick = { vm.seleccionarCategoria(id) }
+                    )
+                }
+            }
         }
 
         /* ── FILTER ROW ── */
@@ -141,7 +169,7 @@ fun CatalogoScreen(vm: CatalogoViewModel = viewModel()) {
             FilterChipItem(
                 label = "Con stock",
                 active = soloStock,
-                onClick = { vm.soloConStock.value = !soloStock }
+                onClick = { vm.soloConStock.value = !soloStock; vm.irAPagina(1) }
             )
             val count = if (uiState is CatalogoUiState.Success) {
                 vm.productosFiltrados((uiState as CatalogoUiState.Success).productos).size
@@ -181,21 +209,32 @@ fun CatalogoScreen(vm: CatalogoViewModel = viewModel()) {
                 }
             }
             is CatalogoUiState.Success -> {
-                val lista = vm.productosFiltrados(state.productos)
-                if (lista.isEmpty()) {
+                val totalPags = vm.totalPaginas(state.productos)
+                val paginados = vm.productosPagina(state.productos)
+                if (vm.productosFiltrados(state.productos).isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Sin resultados", color = ColorMuted, fontSize = 14.sp)
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(lista, key = { it.id }) { producto ->
-                            ProductoCard(producto)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(paginados, key = { it.id }) { producto ->
+                                ProductoCard(producto)
+                            }
+                        }
+                        if (totalPags > 1) {
+                            PaginationBar(
+                                current = currentPage,
+                                total   = totalPags,
+                                onPrev  = { vm.irAPagina(currentPage - 1) },
+                                onNext  = { vm.irAPagina(currentPage + 1) }
+                            )
                         }
                     }
                 }
@@ -235,7 +274,11 @@ fun ProductoCard(producto: Producto) {
         Column {
             /* Image */
             Box(
-                modifier = Modifier.fillMaxWidth().height(140.dp).background(ColorBg),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .clipToBounds()
+                    .background(ColorBg),
                 contentAlignment = Alignment.Center
             ) {
                 if (!producto.imagenUrl.isNullOrBlank()) {
@@ -243,7 +286,9 @@ fun ProductoCard(producto: Producto) {
                         model = producto.imagenUrl,
                         contentDescription = producto.nombre,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
                     )
                 } else {
                     Text("📦", fontSize = 40.sp)
@@ -291,6 +336,42 @@ fun StockBadge(stock: Int) {
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+fun PaginationBar(current: Int, total: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ColorSurface)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val btnColors = ButtonDefaults.outlinedButtonColors(contentColor = ColorPrimary)
+        OutlinedButton(
+            onClick = onPrev,
+            enabled = current > 1,
+            colors = btnColors,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Text("‹ Anterior", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Text(
+            "$current / $total",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = ColorText
+        )
+        OutlinedButton(
+            onClick = onNext,
+            enabled = current < total,
+            colors = btnColors,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Text("Siguiente ›", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

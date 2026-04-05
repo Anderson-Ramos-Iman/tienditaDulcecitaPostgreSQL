@@ -6,3 +6,4 @@ app-movil/.expo/
 app-movil/node_modules/
 app-movil/.gradle/
 app-movil/build/
+schema.sql

@@ -2,6 +2,12 @@ package com.ramosiman.tienditadulcecita.data
 
 import com.google.gson.annotations.SerializedName
 
+data class Categoria(
+    val id: Int,
+    val nombre: String,
+    val icono: String?
+)
+
 data class Producto(
     val id: Int,
     val nombre: String,
@@ -9,7 +15,8 @@ data class Producto(
     val stock: Int,
     @SerializedName("imagen_url") val imagenUrl: String?,
     @SerializedName("tipo_venta") val tipoVenta: String,
-    val activo: Int
+    val activo: Int,
+    val categorias: List<Categoria> = emptyList()
 )
 
 data class ApiResponse<T>(

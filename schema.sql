@@ -15,11 +15,13 @@ DROP TABLE IF EXISTS pedidos CASCADE;
 DROP TABLE IF EXISTS ventas CASCADE;
 DROP TABLE IF EXISTS compras CASCADE;
 DROP TABLE IF EXISTS prestamos CASCADE;
+DROP TABLE IF EXISTS producto_categorias CASCADE;
 DROP TABLE IF EXISTS promociones CASCADE;
 DROP TABLE IF EXISTS clientes CASCADE;
 DROP TABLE IF EXISTS productos CASCADE;
 DROP TABLE IF EXISTS caja CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
+DROP TABLE IF EXISTS categorias CASCADE;
 
 -- ------------------------------------------------------------
 -- usuarios
@@ -30,6 +32,15 @@ CREATE TABLE usuarios (
   email    VARCHAR(100) UNIQUE,
   password VARCHAR(255) NOT NULL,
   rol      VARCHAR(20)
+);
+
+-- ------------------------------------------------------------
+-- categorias
+-- ------------------------------------------------------------
+CREATE TABLE categorias (
+  id     SERIAL PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL UNIQUE,
+  icono  VARCHAR(10)  DEFAULT '🏷️'
 );
 
 -- ------------------------------------------------------------
@@ -216,6 +227,26 @@ CREATE TABLE promociones (
 -- Datos iniciales obligatorios
 -- ============================================================
 
+-- ------------------------------------------------------------
+-- producto_categorias  (→ productos, categorias)
+-- ------------------------------------------------------------
+CREATE TABLE producto_categorias (
+  producto_id  INT NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+  categoria_id INT NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+  PRIMARY KEY (producto_id, categoria_id)
+);
+
+-- Categorías por defecto
+INSERT INTO categorias (nombre, icono) VALUES
+  ('Dulces',    '🍬'),
+  ('Bebidas',   '🥤'),
+  ('Snacks',    '🍿'),
+  ('Lácteos',   '🧀'),
+  ('Panadería', '🍞'),
+  ('Abarrotes', '🛒'),
+  ('Otros',     '📦')
+ON CONFLICT (nombre) DO NOTHING;
+
 -- Fila de caja (el backend siempre usa id = 1)
 INSERT INTO caja (id, saldo_efectivo, saldo_yape) VALUES (1, 0.00, 0.00);
 
@@ -226,3 +257,21 @@ SELECT setval('caja_id_seq', 1);
 INSERT INTO usuarios (nombre, email, password, rol)
 VALUES ('Administrador', 'admin@tiendita.com',
         '$2b$10$sbizNAld4SC/9lKUoB.DNuPTusShHCKbItfaHGi/UbrN.oASKlMy6', 'admin');
+
+-- ============================================================
+-- MIGRACIÓN PARA BD EXISTENTE EN RENDER
+-- Ejecuta SOLO este bloque desde pgAdmin si la BD ya tiene datos
+-- ============================================================
+/*
+CREATE TABLE IF NOT EXISTS categorias (
+  id     SERIAL PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL UNIQUE,
+  icono  VARCHAR(10)  DEFAULT '🏷️'
+);
+
+CREATE TABLE IF NOT EXISTS producto_categorias (
+  producto_id  INT NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+  categoria_id INT NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+  PRIMARY KEY (producto_id, categoria_id)
+);
+*/

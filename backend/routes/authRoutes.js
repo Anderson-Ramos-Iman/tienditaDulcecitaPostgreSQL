@@ -4,5 +4,6 @@ const { authMiddleware } = require('../middleware/auth');
 
 router.post('/login', ctrl.login);
 router.get('/me', authMiddleware(['admin']), ctrl.me);
+router.post('/verify-password', authMiddleware(['admin']), ctrl.verifyPassword);
 
 module.exports = router;

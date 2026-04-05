@@ -32,6 +32,12 @@
   </div>
 </div>
 
+<!-- CATEGORY FILTER -->
+<div class="home-catalog-wrap" style="padding-bottom:0">
+  <div id="category-chips" style="display:flex;flex-wrap:nowrap;gap:8px;padding:14px 0 8px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none"></div>
+  <style>#category-chips::-webkit-scrollbar{display:none}</style>
+</div>
+
 <!-- CATALOG -->
 <div class="home-catalog-wrap">
   <div class="home-catalog-bar">
@@ -50,36 +56,99 @@
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script>
-  let allProducts = [];
+  const PAGE_ROWS = 3;
+  let allProducts  = [];
+  let activeCatIds  = new Set();
+  let searchQuery   = '';
+  let currentPage   = 1;
+  let _cats         = [];
 
-  function renderCatalog(list) {
+  function getPageSize() {
+    const w = window.innerWidth;
+    if (w <= 480) return 2 * PAGE_ROWS;
     const grid = document.getElementById('catalog');
+    const containerWidth = grid.offsetWidth || (w - 56);
+    const minCol = w <= 640 ? 150 : 190;
+    const gap    = w <= 640 ? 12  : 18;
+    const cols   = Math.max(2, Math.floor((containerWidth + gap) / (minCol + gap)));
+    return cols * PAGE_ROWS;
+  }
+
+  /* ── category chips ── */
+  function renderCategoryChips() {
+    const wrap = document.getElementById('category-chips');
+    const all  = [{ id: null, nombre: 'Todas', icono: '🛍️' }, ..._cats];
+    wrap.innerHTML = all.map(c => {
+      const isAll    = c.id === null;
+      const active   = isAll ? activeCatIds.size === 0 : activeCatIds.has(c.id);
+      return `<button onclick="selectCategory(${c.id === null ? 'null' : c.id})"
+        style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:99px;
+               border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};
+               background:${active ? 'var(--primary)' : '#fff'};
+               color:${active ? '#fff' : 'var(--text-muted)'};
+               font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0">
+        <span>${c.icono}</span>${c.nombre}
+      </button>`;
+    }).join('');
+  }
+
+  function selectCategory(id) {
+    if (id === 'null' || id === null) {
+      activeCatIds.clear();
+    } else {
+      const cid = parseInt(id);
+      if (activeCatIds.has(cid)) activeCatIds.delete(cid);
+      else                       activeCatIds.add(cid);
+    }
+    currentPage = 1;
+    renderCategoryChips();
+    applyFilters();
+  }
+
+  /* ── filter + paginate ── */
+  function applyFilters() {
+    let list = allProducts.filter(p => p.activo != 0);
+    if (activeCatIds.size > 0)
+      list = list.filter(p => (p.categorias || []).some(c => activeCatIds.has(c.id)));
+    if (searchQuery)
+      list = list.filter(p => p.nombre.toLowerCase().includes(searchQuery));
+    renderCatalog(list);
+  }
+
+  /* ── cards ── */
+  function renderCatalog(list) {
+    const grid  = document.getElementById('catalog');
     const empty = document.getElementById('catalog-empty');
     const count = document.getElementById('count-label');
 
-    const activos = list.filter(p => p.activo != 0);
-    count.textContent = `${activos.length} producto${activos.length !== 1 ? 's' : ''} disponibles`;
+    const pageSize  = getPageSize();
+    const total     = list.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const page = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-    if (!activos.length) {
-      grid.innerHTML = '';
-      empty.classList.remove('hidden');
-      return;
-    }
+    count.textContent = `${total} producto${total !== 1 ? 's' : ''}`;
+
+    if (!total) { grid.innerHTML = ''; empty.classList.remove('hidden'); renderPagination(0, 0); return; }
     empty.classList.add('hidden');
 
-    grid.innerHTML = activos.map(p => {
+    grid.innerHTML = page.map(p => {
       const imgHtml = p.imagen_url
         ? `<img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\'></i>'">`
         : `<i class="fa-solid fa-box"></i>`;
       const stockBadge = p.stock <= 0
         ? `<span class="chip chip-danger" style="font-size:11px">Agotado</span>`
         : p.stock <= 5
-          ? `<span class="chip chip-warning" style="font-size:11px">Stock: ${p.stock}</span>`
+          ? `<span class="chip chip-warning" style="font-size:11px">Poco: ${p.stock}</span>`
           : `<span class="chip chip-success" style="font-size:11px">Stock: ${p.stock}</span>`;
+      const cats = (p.categorias || []).map(c =>
+        `<span style="font-size:10px;color:var(--text-muted);margin-right:4px">${c.icono} ${c.nombre}</span>`
+      ).join('');
       return `
         <div class="catalog-card">
           <div class="img-area">${imgHtml}</div>
           <div class="card-body">
+            ${cats ? `<div style="margin-bottom:4px">${cats}</div>` : ''}
             <div class="card-name">${p.nombre}</div>
             <div class="card-price">S/ ${parseFloat(p.precio_base).toFixed(2)}</div>
             <div class="card-tipo">${p.tipo_venta === 'por_peso' ? 'Por peso / kg' : 'Por unidad'}</div>
@@ -87,31 +156,104 @@
           </div>
         </div>`;
     }).join('');
+
+    renderPagination(currentPage, totalPages);
   }
 
+  /* ── pagination ── */
+  function renderPagination(page, total) {
+    let wrap = document.getElementById('pagination-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'pagination-wrap';
+      wrap.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:6px;padding:24px 0;flex-wrap:wrap';
+      document.querySelector('.home-catalog-wrap').appendChild(wrap);
+    }
+    if (total <= 1) { wrap.innerHTML = ''; return; }
+
+    const btn = (active, disabled) =>
+      `padding:6px 12px;border-radius:8px;border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};
+       background:${active ? 'var(--primary)' : '#fff'};color:${active ? '#fff' : 'var(--text)'};
+       font-size:13px;font-weight:600;cursor:${disabled ? 'default' : 'pointer'};opacity:${disabled ? '.38' : '1'};min-width:38px`;
+
+    /* Build smart page list: always show first, last, current±1, ellipsis between gaps */
+    const pages = [];
+    if (total <= 5) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3)           pages.push('...');
+      const lo = Math.max(2, page - 1);
+      const hi = Math.min(total - 1, page + 1);
+      for (let i = lo; i <= hi; i++) pages.push(i);
+      if (page < total - 2)   pages.push('...');
+      pages.push(total);
+    }
+
+    let html = `<button onclick="goPage(${page-1})" ${page===1?'disabled':''}
+      style="${btn(false, page===1)}">‹ Anterior</button>`;
+
+    for (const p of pages) {
+      if (p === '...') {
+        html += `<span style="padding:0 2px;color:var(--text-muted);font-size:15px;font-weight:700">…</span>`;
+      } else {
+        html += `<button onclick="goPage(${p})" style="${btn(p===page, false)}">${p}</button>`;
+      }
+    }
+
+    html += `<button onclick="goPage(${page+1})" ${page===total?'disabled':''}
+      style="${btn(false, page===total)}">Siguiente ›</button>`;
+
+    wrap.innerHTML = html;
+  }
+
+  function goPage(p) {
+    currentPage = p;
+    applyFilters();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── load ── */
   async function loadProducts() {
     try {
       const res = await productosAPI.getAll();
       allProducts = res.data || [];
-      renderCatalog(allProducts);
+      currentPage = 1;
+      applyFilters();
     } catch (err) {
       document.getElementById('count-label').textContent = 'Error cargando productos';
-      console.error(err);
     }
+  }
+
+  async function loadCategories() {
+    try {
+      const res = await categoriasAPI.getAll();
+      _cats = res.data || [];
+      renderCategoryChips();
+    } catch (err) { console.error(err); }
   }
 
   let searchTimer;
   document.getElementById('search-input').addEventListener('input', e => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      const q = e.target.value.trim().toLowerCase();
-      const filtered = q ? allProducts.filter(p => p.nombre.toLowerCase().includes(q)) : allProducts;
-      renderCatalog(filtered);
+      searchQuery = e.target.value.trim().toLowerCase();
+      currentPage = 1;
+      applyFilters();
     }, 250);
   });
 
-  document.getElementById('refresh-btn').addEventListener('click', loadProducts);
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    loadCategories();
+    loadProducts();
+  });
 
+  window.addEventListener('resize', () => {
+    clearTimeout(window._resizeTimer);
+    window._resizeTimer = setTimeout(() => applyFilters(), 150);
+  });
+
+  loadCategories();
   loadProducts();
 </script>
 </body>

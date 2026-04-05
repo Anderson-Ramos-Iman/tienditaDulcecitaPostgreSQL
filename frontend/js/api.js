@@ -26,8 +26,9 @@ const api = {
 };
 
 const authAPI = {
-  login: (data)  => api.post('/auth/login', data),
-  me:    ()      => api.get('/auth/me')
+  login:          (data)     => api.post('/auth/login', data),
+  me:             ()         => api.get('/auth/me'),
+  verifyPassword: (password) => api.post('/auth/verify-password', { password })
 };
 
 const productosAPI = {
@@ -94,4 +95,11 @@ const pedidosAPI = {
   create:       (data)   => api.post('/pedidos', data),
   updateEstado: (id, estado) => api.patch(`/pedidos/${id}/estado`, { estado }),
   delete:       (id)     => api.delete(`/pedidos/${id}`)
+};
+
+const categoriasAPI = {
+  getAll:  ()       => api.get('/categorias'),
+  create:  (data)   => api.post('/categorias', data),
+  update:  (id, d)  => api.put(`/categorias/${id}`, d),
+  delete:  (id)     => api.delete(`/categorias/${id}`)
 };
