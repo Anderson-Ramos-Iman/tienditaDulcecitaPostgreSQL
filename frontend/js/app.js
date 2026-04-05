@@ -477,20 +477,27 @@ async function loadProductos(q = '') {
 
 function renderProductos(list) {
   const tbody = document.getElementById('table-productos');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Sin productos</td></tr>'; return; }
-  tbody.innerHTML = list.map(p => `
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin productos</td></tr>'; return; }
+  tbody.innerHTML = list.map(p => {
+    const cats = (p.categorias || []);
+    const catsHtml = cats.length
+      ? cats.map(c => `<span style="display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;color:var(--text);border-radius:99px;padding:2px 8px;font-size:11px;font-weight:500;white-space:nowrap">${c.icono || ''} ${c.nombre}</span>`).join(' ')
+      : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
+    return `
     <tr>
       <td>${p.id}</td>
-      <td><strong>${p.nombre}</strong>${p.categoria_nombre ? `<br><span style="font-size:11px;color:var(--text-muted)">${p.categoria_icono || ''} ${p.categoria_nombre}</span>` : ''}</td>
+      <td><strong>${p.nombre}</strong></td>
       <td>${fmt(p.precio_base)}</td>
       <td><span class="chip ${p.stock > 5 ? 'chip-success' : p.stock > 0 ? 'chip-warning' : 'chip-danger'}">${p.stock}</span></td>
       <td>${p.tipo_venta === 'por_peso' ? 'Por peso' : 'Por unidad'}</td>
+      <td style="max-width:200px"><div style="display:flex;flex-wrap:wrap;gap:4px">${catsHtml}</div></td>
       <td>${p.activo != 0 ? '<span class="chip chip-success">Activo</span>' : '<span class="chip chip-secondary">Inactivo</span>'}</td>
       <td style="display:flex;gap:6px">
         <button class="btn btn-outline btn-sm" onclick="editarProducto(${p.id})"><i class="fa-solid fa-pen"></i></button>
         <button class="btn btn-danger btn-sm"  onclick="eliminarProducto(${p.id})"><i class="fa-solid fa-trash"></i></button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 let prodSearchTimer;
