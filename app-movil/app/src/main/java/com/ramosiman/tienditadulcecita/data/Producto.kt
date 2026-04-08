@@ -1,13 +1,16 @@
 package com.ramosiman.tienditadulcecita.data
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.annotations.SerializedName
 
+@Immutable
 data class Categoria(
     val id: Int,
     val nombre: String,
     val icono: String?
 )
 
+@Immutable
 data class Producto(
     val id: Int,
     val nombre: String,
@@ -19,6 +22,7 @@ data class Producto(
     val categorias: List<Categoria> = emptyList()
 )
 
+@Immutable
 data class ApiResponse<T>(
     val success: Boolean,
     val data: T

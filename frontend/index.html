@@ -95,6 +95,7 @@
                 <div class="payment-section">
                   <label>Tipo de pago</label>
                   <select id="payment-type" class="form-control">
+                    <option value="" disabled selected>Seleccionar tipo...</option>
                     <option value="efectivo">Efectivo</option>
                     <option value="yape">Yape</option>
                     <option value="deuda">Deuda</option>
@@ -184,18 +185,51 @@
           <h2>Productos</h2>
           <button class="btn btn-primary" id="btn-nuevo-producto"><i class="fa-solid fa-plus"></i> Nuevo Producto</button>
         </div>
-        <div class="filters-row" style="margin-bottom:16px">
-          <div class="search-box" style="position:relative;flex:1;max-width:320px">
-            <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
-            <input id="prod-search" type="text" class="form-control" placeholder="Buscar producto..." style="padding-left:34px">
+        <div style="display:flex;gap:16px;align-items:flex-start">
+
+          <!-- SIDEBAR CATEGORÍAS -->
+          <div style="width:190px;flex-shrink:0">
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em">Categorías</div>
+              <div id="prod-cat-sidebar"></div>
+            </div>
           </div>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>#</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Tipo</th><th>Categorías</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody id="table-productos"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
-            </table>
+
+          <!-- MAIN -->
+          <div style="flex:1;min-width:0">
+            <div class="filters-row" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div class="search-box" style="position:relative;flex:1;max-width:300px">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+                <input id="prod-search" type="text" class="form-control" placeholder="Buscar producto..." style="padding-left:34px">
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:13px;color:var(--text-muted);font-weight:500">Ordenar:</span>
+                <select id="prod-sort-select" class="form-control" style="width:auto;font-size:13px;padding:6px 10px" onchange="setSortProd(this.value)">
+                  <option value="nombre:asc">Nombre A→Z</option>
+                  <option value="nombre:desc">Nombre Z→A</option>
+                  <option value="id:asc"># Menor→Mayor</option>
+                  <option value="id:desc"># Mayor→Menor</option>
+                  <option value="stock:desc">Stock ↓ Mayor</option>
+                  <option value="stock:asc">Stock ↑ Menor</option>
+                  <option value="precio_base:asc">Precio ↑ Menor</option>
+                  <option value="precio_base:desc">Precio ↓ Mayor</option>
+                </select>
+              </div>
+            </div>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead id="thead-productos"><tr>
+                    <th onclick="clickSortProd('id')" style="cursor:pointer;user-select:none;white-space:nowrap"># <span id="sort-icon-id"></span></th>
+                    <th onclick="clickSortProd('nombre')" style="cursor:pointer;user-select:none;white-space:nowrap">Nombre <span id="sort-icon-nombre">↑</span></th>
+                    <th onclick="clickSortProd('precio_base')" style="cursor:pointer;user-select:none;white-space:nowrap">Precio <span id="sort-icon-precio_base"></span></th>
+                    <th onclick="clickSortProd('stock')" style="cursor:pointer;user-select:none;white-space:nowrap">Stock <span id="sort-icon-stock"></span></th>
+                    <th>Tipo</th><th>Categorías</th><th>Estado</th><th>Acciones</th>
+                  </tr></thead>
+                  <tbody id="table-productos"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -427,14 +461,19 @@
     <div class="modal-body">
 
       <!-- Agregar producto -->
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid var(--primary);border-radius:10px;padding:14px 16px;margin-bottom:18px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">
           <i class="fa-solid fa-circle-plus" style="color:var(--primary)"></i> Agregar Producto
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Producto</label>
-            <select id="compra-add-prod" class="form-control"><option value="">Seleccionar producto...</option></select>
+            <div style="position:relative">
+              <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:12px;pointer-events:none;z-index:1"></i>
+              <input type="text" id="compra-prod-input" class="form-control" placeholder="Escribir para buscar..." autocomplete="off" style="padding-left:30px">
+              <input type="hidden" id="compra-add-prod" value="">
+              <div id="compra-prod-dropdown" style="display:none;position:absolute;top:calc(100% - 1px);left:0;right:0;max-height:260px;overflow-y:auto;background:#fff;border:1.5px solid var(--primary);border-top:1px solid #e2e8f0;border-radius:0 0 8px 8px;z-index:500;box-shadow:0 6px 20px rgba(0,0,0,.1)"></div>
+            </div>
           </div>
           <div class="form-group">
             <label>Cantidad</label>
@@ -463,7 +502,7 @@
       </div>
 
       <!-- Lista de productos -->
-      <div style="margin-bottom:18px">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #10b981;border-radius:10px;padding:14px 16px;margin-bottom:18px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">
           <i class="fa-solid fa-list-check" style="color:var(--primary)"></i> Productos a Comprar
         </div>
@@ -491,7 +530,7 @@
       </div>
 
       <!-- Forma de pago -->
-      <div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:10px;padding:14px 16px">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:12px">
           <i class="fa-solid fa-credit-card" style="color:var(--primary)"></i> Forma de Pago
         </div>
@@ -732,6 +771,23 @@
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-ajuste">Cancelar</button>
       <button class="btn btn-warning" id="btn-confirmar-ajuste"><i class="fa-solid fa-sliders"></i> Aplicar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmar Venta Modal -->
+<div class="modal-overlay hidden" id="modal-confirm-venta">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-receipt" style="color:var(--success);margin-right:8px"></i>Confirmar Venta</h3>
+      <button class="modal-close" onclick="cerrarConfirmVenta()">&times;</button>
+    </div>
+    <div class="modal-body" id="confirm-venta-detalle"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="cerrarConfirmVenta()">Cancelar</button>
+      <button class="btn btn-success" id="btn-confirmar-venta-final" onclick="confirmarVentaFinal()">
+        <i class="fa-solid fa-check"></i> Confirmar Venta
+      </button>
     </div>
   </div>
 </div>

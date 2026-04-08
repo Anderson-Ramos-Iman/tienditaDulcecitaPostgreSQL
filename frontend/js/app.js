@@ -16,6 +16,9 @@ const showErr = m => toast(m, 'error');
 const showWarn= m => toast(m, 'warning');
 
 function fmt(n) { return 'S/ ' + parseFloat(n || 0).toFixed(2); }
+function sinTildes(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
 function fmtDate(s) {
   if (!s) return '—';
   return new Date(s).toLocaleString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -133,8 +136,8 @@ let posSearchTimer;
 document.getElementById('pos-search').addEventListener('input', e => {
   clearTimeout(posSearchTimer);
   posSearchTimer = setTimeout(() => {
-    const q = e.target.value.trim().toLowerCase();
-    renderPOSProducts(q ? allProductosPOS.filter(p => p.nombre.toLowerCase().includes(q)) : allProductosPOS);
+    const q = sinTildes(e.target.value.trim());
+    renderPOSProducts(q ? allProductosPOS.filter(p => sinTildes(p.nombre).includes(q)) : allProductosPOS);
   }, 200);
 });
 
@@ -227,14 +230,20 @@ handlePaymentTypeChange();
 
 document.getElementById('btn-limpiar-carrito').addEventListener('click', () => { carrito = []; renderCart(); });
 
-document.getElementById('btn-completar-venta').addEventListener('click', async () => {
+let _ventaDataPendiente = null;
+
+document.getElementById('btn-completar-venta').addEventListener('click', () => mostrarConfirmacionVenta());
+
+function mostrarConfirmacionVenta() {
   if (!carrito.length) { showWarn('El carrito está vacío'); return; }
   const tipoPago = document.getElementById('payment-type').value;
-  const redondeo = parseFloat(document.getElementById('cart-redondeo').value) || 0;
+  if (!tipoPago) { showWarn('Seleccione un tipo de pago'); return; }
+  const redondeo  = parseFloat(document.getElementById('cart-redondeo').value) || 0;
+  const subtotal  = carrito.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+  const total     = subtotal + redondeo;
 
   const ventaData = {
-    tipo_pago: tipoPago,
-    redondeo,
+    tipo_pago: tipoPago, redondeo,
     productos: carrito.map(i => ({ producto_id: i.producto_id, cantidad: i.cantidad, precio_unitario: i.precio_unitario }))
   };
 
@@ -245,21 +254,71 @@ document.getElementById('btn-completar-venta').addEventListener('click', async (
     const clienteId = document.getElementById('select-cliente').value;
     if (!clienteId) { showWarn('Seleccione un cliente para venta a deuda'); return; }
     ventaData.cliente_id = parseInt(clienteId);
+  } else if (tipoPago === 'efectivo') {
+    ventaData.monto_efectivo = parseFloat(document.getElementById('monto-recibido').value) || 0;
   }
 
-  const btn = document.getElementById('btn-completar-venta');
+  _ventaDataPendiente = ventaData;
+
+  const tipoLabels = { efectivo: 'Efectivo', yape: 'Yape', deuda: 'Deuda', mixto: 'Mixto (Efectivo + Yape)', cortesia: 'Cortesía (gratis)' };
+  let clienteHtml = '';
+  if (tipoPago === 'deuda') {
+    const sel = document.getElementById('select-cliente');
+    const nombre = sel.options[sel.selectedIndex]?.text || '';
+    clienteHtml = `<div style="display:flex;justify-content:space-between;font-size:13px;background:#fef9c3;padding:8px 12px;border-radius:8px;margin-top:4px">
+      <span style="color:var(--text-muted)">Cliente</span><strong>${nombre}</strong></div>`;
+  }
+
+  const itemsHtml = carrito.map(i => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px">
+      <div><strong>${i.nombre}</strong><span style="color:var(--text-muted);margin-left:8px">x${i.cantidad} × ${fmt(i.precio_unitario)}</span></div>
+      <div style="font-weight:600">${fmt(i.cantidad * i.precio_unitario)}</div>
+    </div>`).join('');
+
+  document.getElementById('confirm-venta-detalle').innerHTML = `
+    <div style="max-height:220px;overflow-y:auto;margin-bottom:14px">${itemsHtml}</div>
+    <div style="border-top:2px solid #e2e8f0;padding-top:12px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+      ${redondeo !== 0 ? `<div style="display:flex;justify-content:space-between;font-size:13px"><span>Redondeo</span><span>${redondeo > 0 ? '+' : ''}${fmt(redondeo)}</span></div>` : ''}
+      <div style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--primary)"><span>TOTAL</span><span>${fmt(total)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;background:#f8fafc;padding:8px 12px;border-radius:8px;margin-top:4px">
+        <span style="color:var(--text-muted)">Tipo de pago</span><strong>${tipoLabels[tipoPago] || tipoPago}</strong></div>
+      ${clienteHtml}
+    </div>`;
+
+  document.getElementById('modal-confirm-venta').classList.remove('hidden');
+}
+
+function cerrarConfirmVenta() {
+  document.getElementById('modal-confirm-venta').classList.add('hidden');
+  _ventaDataPendiente = null;
+}
+
+async function confirmarVentaFinal() {
+  if (!_ventaDataPendiente) return;
+  const btn = document.getElementById('btn-confirmar-venta-final');
   btn.disabled = true;
   try {
-    await ventasAPI.create(ventaData);
+    await ventasAPI.create(_ventaDataPendiente);
+    cerrarConfirmVenta();
     showOk('✅ Venta completada correctamente');
-    carrito = [];
-    document.getElementById('cart-redondeo').value = '0';
-    document.getElementById('monto-recibido').value = '';
-    renderCart();
+    resetCartForm();
     await PAGE_LOADERS.pos();
   } catch (e) { showErr(e.message); }
   finally { btn.disabled = false; }
-});
+}
+
+function resetCartForm() {
+  carrito = [];
+  document.getElementById('cart-redondeo').value   = '0';
+  document.getElementById('monto-recibido').value   = '';
+  document.getElementById('mixto-efectivo').value   = '';
+  document.getElementById('mixto-yape').value       = '';
+  document.getElementById('payment-type').value     = '';
+  document.getElementById('select-cliente').value   = '';
+  handlePaymentTypeChange();
+  renderCart();
+}
 
 async function loadClientesSelect() {
   try {
@@ -441,14 +500,53 @@ function exportVentasExcel() {
    ============================================================ */
 PAGE_LOADERS.productos = () => { loadProductos(); loadCategoriasCheckboxes(); };
 
-let _allCategorias = [];
+let _allCategorias    = [];
+let _lastProductos    = [];
+let _prodSort         = { field: 'nombre', dir: 'asc' };
+let _prodCatFilter    = new Set();
+let _prodSearchQuery  = '';
 
 async function loadCategoriasCheckboxes(selectedIds = []) {
   try {
     const res = await categoriasAPI.getAll();
     _allCategorias = res.data || [];
     renderCategoriasCheckboxes(selectedIds);
+    renderProdCatSidebar();
   } catch (e) { /* silencioso */ }
+}
+
+function renderProdCatSidebar() {
+  const wrap = document.getElementById('prod-cat-sidebar');
+  if (!wrap) return;
+  const all = [{ id: null, nombre: 'Todas', icono: '' }, ..._allCategorias];
+  wrap.innerHTML = all.map(c => {
+    const isAll  = c.id === null;
+    const active = isAll ? _prodCatFilter.size === 0 : _prodCatFilter.has(c.id);
+    return `<div onclick="toggleProdCatFilter(${c.id === null ? 'null' : c.id})"
+      style="display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;
+             font-size:13px;font-weight:${active ? '600' : '400'};
+             color:${active ? 'var(--primary)' : 'var(--text)'};
+             background:${active ? '#eff6ff' : '#fff'};
+             border-bottom:1px solid #f8fafc;transition:background .1s"
+      onmouseover="if(this.style.background!=='rgb(239,246,255)')this.style.background='#f8fafc'"
+      onmouseout="this.style.background='${active ? '#eff6ff' : '#fff'}'">
+      <span style="width:14px;flex-shrink:0">${active ? '<i class="fa-solid fa-check" style="font-size:10px;color:var(--primary)"></i>' : ''}</span>
+      ${c.icono ? `<span>${c.icono}</span>` : ''}
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.nombre}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleProdCatFilter(id) {
+  if (id === 'null' || id === null) {
+    _prodCatFilter.clear();
+  } else {
+    const cid = parseInt(id);
+    if (_prodCatFilter.has(cid)) _prodCatFilter.delete(cid);
+    else                         _prodCatFilter.add(cid);
+  }
+  renderProdCatSidebar();
+  renderProductos(_lastProductos);
 }
 
 function renderCategoriasCheckboxes(selectedIds = []) {
@@ -468,6 +566,40 @@ function renderCategoriasCheckboxes(selectedIds = []) {
   }).join('');
 }
 
+function setSortProd(val) {
+  const [field, dir] = val.split(':');
+  _prodSort = { field, dir };
+  updateSortIcons();
+  renderProductos(_lastProductos);
+}
+
+function clickSortProd(field) {
+  if (_prodSort.field === field) {
+    _prodSort.dir = _prodSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _prodSort.field = field;
+    _prodSort.dir   = (field === 'stock' || field === 'precio_base') ? 'desc' : 'asc';
+  }
+  const sel = document.getElementById('prod-sort-select');
+  if (sel) sel.value = `${_prodSort.field}:${_prodSort.dir}`;
+  updateSortIcons();
+  renderProductos(_lastProductos);
+}
+
+function updateSortIcons() {
+  const fields = ['id', 'nombre', 'precio_base', 'stock'];
+  fields.forEach(f => {
+    const el = document.getElementById(`sort-icon-${f}`);
+    if (!el) return;
+    if (_prodSort.field === f) {
+      el.textContent = _prodSort.dir === 'asc' ? '↑' : '↓';
+      el.style.color = 'var(--primary)';
+    } else {
+      el.textContent = '';
+    }
+  });
+}
+
 async function loadProductos(q = '') {
   try {
     const res = q ? await productosAPI.getAll(q) : await productosAPI.getAll();
@@ -476,9 +608,25 @@ async function loadProductos(q = '') {
 }
 
 function renderProductos(list) {
+  _lastProductos = list;
+  let filtered = _prodCatFilter.size > 0
+    ? list.filter(p => (p.categorias || []).some(c => _prodCatFilter.has(c.id)))
+    : list;
+  if (_prodSearchQuery)
+    filtered = filtered.filter(p => sinTildes(p.nombre).includes(_prodSearchQuery));
+  const { field, dir } = _prodSort;
+  const sorted = [...filtered].sort((a, b) => {
+    let va = a[field] ?? '', vb = b[field] ?? '';
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    else { va = parseFloat(va) || 0; vb = parseFloat(vb) || 0; }
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  updateSortIcons();
   const tbody = document.getElementById('table-productos');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin productos</td></tr>'; return; }
-  tbody.innerHTML = list.map(p => {
+  if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Sin productos</td></tr>'; return; }
+  tbody.innerHTML = sorted.map(p => {
     const cats = (p.categorias || []);
     const catsHtml = cats.length
       ? cats.map(c => `<span style="display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;color:var(--text);border-radius:99px;padding:2px 8px;font-size:11px;font-weight:500;white-space:nowrap">${c.icono || ''} ${c.nombre}</span>`).join(' ')
@@ -503,7 +651,10 @@ function renderProductos(list) {
 let prodSearchTimer;
 document.getElementById('prod-search').addEventListener('input', e => {
   clearTimeout(prodSearchTimer);
-  prodSearchTimer = setTimeout(() => loadProductos(e.target.value.trim()), 300);
+  prodSearchTimer = setTimeout(() => {
+    _prodSearchQuery = sinTildes(e.target.value.trim());
+    renderProductos(_lastProductos);
+  }, 300);
 });
 
 function setStockLocked(locked) {
@@ -608,6 +759,7 @@ document.getElementById('btn-confirm-stock-pwd').addEventListener('click', async
    ============================================================ */
 let compraItems = [];
 let _allCompras = [];
+let _allProductosCompra = [];
 
 PAGE_LOADERS.compras = () => loadCompras();
 
@@ -667,27 +819,72 @@ async function abrirModalCompra() {
   document.getElementById('compra-redondeo').value = '0';
   document.getElementById('compra-prestamo-desc').value = '';
   document.getElementById('compra-add-prod').value = '';
+  document.getElementById('compra-prod-input').value = '';
+  document.getElementById('compra-prod-input').style.borderColor = '';
+  document.getElementById('compra-prod-dropdown').style.display = 'none';
   document.getElementById('compra-add-cant').value = '1';
   document.getElementById('compra-add-monto').value = '0.00';
   document.getElementById('compra-add-precio-ref').value = '';
   document.getElementById('compra-add-bonif').checked = false;
   document.getElementById('compra-total-calc').textContent = 'S/ 0.00';
 
-  const sel = document.getElementById('compra-add-prod');
-  while (sel.options.length > 1) sel.remove(1);
   try {
     const r = await productosAPI.getAllForCompras();
-    (r.data || []).forEach(p => {
-      const o = document.createElement('option');
-      o.value = p.id;
-      o.textContent = p.nombre + (p.activo == 0 ? ' (inactivo)' : '');
-      sel.appendChild(o);
-    });
+    _allProductosCompra = r.data || [];
   } catch {}
   openModal('modal-compra');
 }
 
 document.getElementById('btn-nueva-compra').addEventListener('click', abrirModalCompra);
+
+/* ── Combobox de producto para compras ── */
+(function initCompraProdCombobox() {
+  const input    = document.getElementById('compra-prod-input');
+  const hidden   = document.getElementById('compra-add-prod');
+  const dropdown = document.getElementById('compra-prod-dropdown');
+
+  function renderDropdown(q) {
+    const list = q
+      ? _allProductosCompra.filter(p => sinTildes(p.nombre).includes(sinTildes(q)))
+      : _allProductosCompra.slice(0, 80);
+    if (!list.length) {
+      dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-muted);font-size:13px">Sin resultados</div>';
+    } else {
+      dropdown.innerHTML = list.map(p =>
+        `<div data-id="${p.id}" data-nombre="${p.nombre.replace(/"/g,'&quot;')}"
+          style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9;
+                 display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre}${p.activo==0?' <span style="color:#94a3b8;font-size:11px">(inactivo)</span>':''}</span>
+          <span style="font-size:11px;color:var(--text-muted);background:#f1f5f9;padding:2px 7px;border-radius:99px;flex-shrink:0">Stock: ${p.stock}</span>
+        </div>`
+      ).join('');
+    }
+    dropdown.style.display = 'block';
+    dropdown.querySelectorAll('[data-id]').forEach(el => {
+      el.addEventListener('mouseenter', () => el.style.background = '#eff6ff');
+      el.addEventListener('mouseleave', () => el.style.background = '');
+      el.addEventListener('click', () => {
+        hidden.value = el.dataset.id;
+        input.value  = el.dataset.nombre;
+        input.style.borderColor = 'var(--primary)';
+        dropdown.style.display  = 'none';
+      });
+    });
+  }
+
+  input.addEventListener('input', () => {
+    hidden.value = '';
+    input.style.borderColor = '';
+    renderDropdown(input.value.trim());
+  });
+  input.addEventListener('focus', () => renderDropdown(input.value.trim()));
+
+  document.addEventListener('click', e => {
+    if (!input.closest('[style*="position:relative"]').contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+})();
 
 function calcPrecioRef() {
   const cant  = parseFloat(document.getElementById('compra-add-cant').value) || 0;
@@ -704,7 +901,7 @@ document.getElementById('compra-add-bonif').addEventListener('change', calcPreci
 
 document.getElementById('btn-add-compra-item').addEventListener('click', () => {
   const prodId  = parseInt(document.getElementById('compra-add-prod').value);
-  const prodNom = document.getElementById('compra-add-prod').selectedOptions[0]?.text || '';
+  const prodNom = document.getElementById('compra-prod-input').value.trim();
   const cant    = parseFloat(document.getElementById('compra-add-cant').value) || 1;
   const monto   = parseFloat(document.getElementById('compra-add-monto').value) || 0;
   const bonif   = document.getElementById('compra-add-bonif').checked;
@@ -718,6 +915,9 @@ document.getElementById('btn-add-compra-item').addEventListener('click', () => {
   renderCompraItemsTable();
 
   document.getElementById('compra-add-prod').value = '';
+  document.getElementById('compra-prod-input').value = '';
+  document.getElementById('compra-prod-input').style.borderColor = '';
+  document.getElementById('compra-prod-dropdown').style.display = 'none';
   document.getElementById('compra-add-cant').value = '1';
   document.getElementById('compra-add-monto').value = '0.00';
   document.getElementById('compra-add-precio-ref').value = '';

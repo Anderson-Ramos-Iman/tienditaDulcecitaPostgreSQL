@@ -5,9 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.ramosiman.tienditadulcecita.data.Categoria
 import com.ramosiman.tienditadulcecita.data.Producto
 import com.ramosiman.tienditadulcecita.data.RetrofitClient
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
+import java.text.Normalizer
+
+private fun String.sinTildes(): String =
+    Normalizer.normalize(this, Normalizer.Form.NFD)
+        .replace(Regex("[\\p{InCombiningDiacriticalMarks}]"), "")
+        .lowercase()
 
 sealed class CatalogoUiState {
     object Loading : CatalogoUiState()
@@ -15,6 +21,7 @@ sealed class CatalogoUiState {
     data class Error(val message: String) : CatalogoUiState()
 }
 
+@OptIn(FlowPreview::class)
 class CatalogoViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<CatalogoUiState>(CatalogoUiState.Loading)
@@ -26,8 +33,38 @@ class CatalogoViewModel : ViewModel() {
     val activeCategoriaId = MutableStateFlow<Int?>(null)
     val currentPage       = MutableStateFlow(1)
 
-    // 2 columns × 3 rows
-    val pageSize = 6
+    val pageSize = 30
+
+    /* ── Debounced search — only fires 300 ms after user stops typing ── */
+    private val searchDebounced: StateFlow<String> = searchQuery
+        .debounce(300L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+    /* ── Derived reactive flows (computed in coroutine, cached) ── */
+
+    val productosFiltrados: StateFlow<List<Producto>> = combine(
+        _uiState, searchDebounced, soloConStock, activeCategoriaId
+    ) { state, q, stock, catId ->
+        val lista = if (state is CatalogoUiState.Success) state.productos else return@combine emptyList()
+        var result = lista
+        if (stock) result = result.filter { it.stock > 0 }
+        if (q.trim().isNotEmpty()) {
+            val query = q.trim().sinTildes()
+            result = result.filter { it.nombre.sinTildes().contains(query) }
+        }
+        if (catId != null) result = result.filter { p -> p.categorias.any { it.id == catId } }
+        result
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val totalPaginas: StateFlow<Int> = productosFiltrados.map { filtered ->
+        maxOf(1, (filtered.size + pageSize - 1) / pageSize)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 1)
+
+    val productosPagina: StateFlow<List<Producto>> = combine(
+        productosFiltrados, currentPage
+    ) { filtered, page ->
+        filtered.drop((page - 1) * pageSize).take(pageSize)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         cargarProductos()
@@ -55,24 +92,6 @@ class CatalogoViewModel : ViewModel() {
             } catch (e: Exception) { /* silent */ }
         }
     }
-
-    fun productosFiltrados(productos: List<Producto>): List<Producto> {
-        val q     = searchQuery.value.trim().lowercase()
-        val catId = activeCategoriaId.value
-        return productos
-            .filter { if (soloConStock.value) it.stock > 0 else true }
-            .filter { if (q.isNotEmpty()) it.nombre.lowercase().contains(q) else true }
-            .filter { if (catId != null) it.categorias.any { c -> c.id == catId } else true }
-    }
-
-    fun productosPagina(productos: List<Producto>): List<Producto> {
-        val filtered = productosFiltrados(productos)
-        val p = currentPage.value
-        return filtered.drop((p - 1) * pageSize).take(pageSize)
-    }
-
-    fun totalPaginas(productos: List<Producto>): Int =
-        maxOf(1, (productosFiltrados(productos).size + pageSize - 1) / pageSize)
 
     fun seleccionarCategoria(id: Int?) {
         activeCategoriaId.value = id

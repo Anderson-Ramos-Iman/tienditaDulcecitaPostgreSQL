@@ -74,7 +74,18 @@ class ProductoService {
   async buscar(termino) {
     const t = `%${termino}%`;
     return query(
-      `SELECT * FROM productos WHERE nombre ILIKE $1 AND (activo = 1 OR activo IS NULL) ORDER BY nombre LIMIT 20`,
+      `SELECT p.*,
+        COALESCE(
+          json_agg(json_build_object('id', c.id, 'nombre', c.nombre, 'icono', c.icono))
+          FILTER (WHERE c.id IS NOT NULL), '[]'
+        ) AS categorias
+       FROM productos p
+       LEFT JOIN producto_categorias pc ON pc.producto_id = p.id
+       LEFT JOIN categorias c ON c.id = pc.categoria_id
+       WHERE p.nombre ILIKE $1 AND (p.activo = 1 OR p.activo IS NULL)
+       GROUP BY p.id
+       ORDER BY p.nombre
+       LIMIT 50`,
       [t]
     );
   }

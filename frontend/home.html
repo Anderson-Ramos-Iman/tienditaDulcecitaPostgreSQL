@@ -8,6 +8,33 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .cat-dropdown-panel { display:none;position:absolute;top:calc(100% + 8px);left:0;min-width:240px;
+      background:#fff;border:1px solid var(--border);border-radius:12px;
+      box-shadow:0 8px 28px rgba(0,0,0,.13);z-index:300;overflow:hidden;max-height:360px;overflow-y:auto; }
+    .cat-dropdown-item { display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;
+      font-size:14px;color:var(--text);border-bottom:1px solid #f8fafc;transition:background .1s; }
+    .cat-dropdown-item:last-child { border-bottom:none; }
+    .cat-dropdown-item:hover { background:#f8fafc; }
+    .cat-dropdown-item.active { background:#eff6ff; font-weight:600; }
+    .cat-dropdown-btn { display:inline-flex;align-items:center;gap:8px;padding:9px 18px;
+      border-radius:8px;border:1.5px solid var(--border);background:#fff;
+      font-size:14px;font-weight:600;color:var(--text);cursor:pointer;transition:.15s;white-space:nowrap; }
+    .cat-dropdown-btn:hover,.cat-dropdown-btn.open { border-color:var(--primary);color:var(--primary); }
+    .cat-chevron { font-size:11px;transition:transform .2s; }
+    .home-footer { background:#1e293b;color:#94a3b8;padding:40px 0 24px;margin-top:48px; }
+    .home-footer-inner { max-width:1100px;margin:0 auto;padding:0 28px;
+      display:flex;flex-wrap:wrap;gap:32px;justify-content:space-between; }
+    .home-footer-brand { display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:#fff;margin-bottom:6px; }
+    .home-footer-sub { font-size:13px;color:#64748b; }
+    .home-footer-copy { font-size:12px;color:#475569;text-align:center;margin-top:32px;border-top:1px solid #334155;padding-top:20px; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .skel { border-radius:6px;background:linear-gradient(90deg,#e8ecf0 25%,#d8dde3 50%,#e8ecf0 75%);
+      background-size:200% 100%;animation:shimmer 1.4s infinite; }
+    .skel-card { background:#fff;border:1.5px solid #e8ecf0;border-radius:12px;overflow:hidden; }
+    .skel-img  { width:100%;height:170px; }
+    .skel-body { padding:14px;display:flex;flex-direction:column;gap:8px; }
+  </style>
 </head>
 <body class="home-body">
 
@@ -34,8 +61,16 @@
 
 <!-- CATEGORY FILTER -->
 <div class="home-catalog-wrap" style="padding-bottom:0">
-  <div id="category-chips" style="display:flex;flex-wrap:nowrap;gap:8px;padding:14px 0 8px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none"></div>
-  <style>#category-chips::-webkit-scrollbar{display:none}</style>
+  <div style="padding:12px 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div id="cat-dropdown-wrap" style="position:relative">
+      <button class="cat-dropdown-btn" id="cat-dropdown-btn" onclick="toggleCatDropdown()">
+        <i class="fa-solid fa-bars"></i> Categorías<span id="cat-badge" style="color:var(--primary)"></span>
+        <i class="fa-solid fa-chevron-down cat-chevron" id="cat-chevron"></i>
+      </button>
+      <div class="cat-dropdown-panel" id="cat-dropdown-panel"></div>
+    </div>
+    <div id="active-cats-display" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
 </div>
 
 <!-- CATALOG -->
@@ -46,17 +81,23 @@
       <i class="fa-solid fa-rotate-right"></i> Actualizar
     </button>
   </div>
+  <div id="pagination-top" style="padding:4px 0 12px"></div>
   <div id="catalog" class="catalog-grid"></div>
   <div id="catalog-empty" class="hidden home-empty">
     <i class="fa-solid fa-box-open"></i>
     <p style="font-size:15px">No se encontraron productos</p>
   </div>
+  <div id="pagination-bottom" style="padding:20px 0 8px"></div>
 </div>
 
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script>
-  const PAGE_ROWS = 3;
+  function sinTildes(str) {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  const PAGE_ROWS = 5;
   let allProducts  = [];
   let activeCatIds  = new Set();
   let searchQuery   = '';
@@ -74,23 +115,54 @@
     return cols * PAGE_ROWS;
   }
 
-  /* ── category chips ── */
-  function renderCategoryChips() {
-    const wrap = document.getElementById('category-chips');
-    const all  = [{ id: null, nombre: 'Todas', icono: '🛍️' }, ..._cats];
-    wrap.innerHTML = all.map(c => {
-      const isAll    = c.id === null;
-      const active   = isAll ? activeCatIds.size === 0 : activeCatIds.has(c.id);
-      return `<button onclick="selectCategory(${c.id === null ? 'null' : c.id})"
-        style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:99px;
-               border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};
-               background:${active ? 'var(--primary)' : '#fff'};
-               color:${active ? '#fff' : 'var(--text-muted)'};
-               font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0">
-        <span>${c.icono}</span>${c.nombre}
-      </button>`;
+  /* ── category dropdown ── */
+  function renderCategoryDropdown() {
+    const panel  = document.getElementById('cat-dropdown-panel');
+    const all    = [{ id: null, nombre: 'Todo', icono: '' }, ..._cats];
+    panel.innerHTML = all.map(c => {
+      const isAll  = c.id === null;
+      const active = isAll ? activeCatIds.size === 0 : activeCatIds.has(c.id);
+      return `<div class="cat-dropdown-item${active ? ' active' : ''}" onclick="selectCategory(${c.id === null ? 'null' : c.id})">
+        <span style="width:18px;text-align:center;color:var(--primary);font-weight:700">${active ? '✓' : ''}</span>
+        ${c.icono ? `<span>${c.icono}</span>` : ''}
+        <span>${c.nombre}</span>
+      </div>`;
     }).join('');
+
+    const display  = document.getElementById('active-cats-display');
+    const selected = _cats.filter(c => activeCatIds.has(c.id));
+    display.innerHTML = selected.map(c =>
+      `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                   border-radius:99px;background:var(--primary);color:#fff;font-size:12px;font-weight:600">
+        ${c.icono || ''} ${c.nombre}
+        <button onclick="event.stopPropagation();selectCategory(${c.id})"
+          style="background:none;border:none;color:#fff;cursor:pointer;padding:0 0 0 2px;font-size:15px;line-height:1">×</button>
+      </span>`
+    ).join('');
+
+    const badge = document.getElementById('cat-badge');
+    if (badge) badge.textContent = activeCatIds.size > 0 ? ` (${activeCatIds.size})` : '';
   }
+
+  function toggleCatDropdown() {
+    const panel   = document.getElementById('cat-dropdown-panel');
+    const btn     = document.getElementById('cat-dropdown-btn');
+    const chevron = document.getElementById('cat-chevron');
+    const isOpen  = panel.style.display === 'block';
+    panel.style.display = isOpen ? 'none' : 'block';
+    chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    btn.classList.toggle('open', !isOpen);
+  }
+
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('cat-dropdown-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('cat-dropdown-panel').style.display = 'none';
+      const chevron = document.getElementById('cat-chevron');
+      if (chevron) chevron.style.transform = '';
+      document.getElementById('cat-dropdown-btn').classList.remove('open');
+    }
+  });
 
   function selectCategory(id) {
     if (id === 'null' || id === null) {
@@ -101,17 +173,17 @@
       else                       activeCatIds.add(cid);
     }
     currentPage = 1;
-    renderCategoryChips();
+    renderCategoryDropdown();
     applyFilters();
   }
 
-  /* ── filter + paginate ── */
+  /* ── filter ── */
   function applyFilters() {
     let list = allProducts.filter(p => p.activo != 0);
     if (activeCatIds.size > 0)
       list = list.filter(p => (p.categorias || []).some(c => activeCatIds.has(c.id)));
     if (searchQuery)
-      list = list.filter(p => p.nombre.toLowerCase().includes(searchQuery));
+      list = list.filter(p => sinTildes(p.nombre).includes(searchQuery));
     renderCatalog(list);
   }
 
@@ -121,18 +193,18 @@
     const empty = document.getElementById('catalog-empty');
     const count = document.getElementById('count-label');
 
-    const pageSize  = getPageSize();
-    const total     = list.length;
+    const pageSize   = getPageSize();
+    const total      = list.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     if (currentPage > totalPages) currentPage = totalPages;
-    const page = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const pagSlice   = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     count.textContent = `${total} producto${total !== 1 ? 's' : ''}`;
 
     if (!total) { grid.innerHTML = ''; empty.classList.remove('hidden'); renderPagination(0, 0); return; }
     empty.classList.add('hidden');
 
-    grid.innerHTML = page.map(p => {
+    grid.innerHTML = pagSlice.map(p => {
       const imgHtml = p.imagen_url
         ? `<img src="${p.imagen_url}" alt="${p.nombre}" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-image\\'></i>'">`
         : `<i class="fa-solid fa-box"></i>`;
@@ -161,50 +233,49 @@
   }
 
   /* ── pagination ── */
-  function renderPagination(page, total) {
-    let wrap = document.getElementById('pagination-wrap');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'pagination-wrap';
-      wrap.style.cssText = 'display:flex;justify-content:center;align-items:center;gap:6px;padding:24px 0;flex-wrap:wrap';
-      document.querySelector('.home-catalog-wrap').appendChild(wrap);
-    }
-    if (total <= 1) { wrap.innerHTML = ''; return; }
+  function buildPaginationHtml(page, total) {
+    if (total <= 1) return '';
+    const bStyle = (active, disabled) =>
+      `display:inline-flex;align-items:center;justify-content:center;
+       min-width:38px;height:38px;padding:0 12px;border-radius:8px;
+       border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};
+       background:${active ? 'var(--primary)' : '#fff'};
+       color:${active ? '#fff' : 'var(--text)'};
+       font-size:13px;font-weight:600;
+       cursor:${disabled ? 'default' : 'pointer'};
+       opacity:${disabled ? '.38' : '1'}`;
 
-    const btn = (active, disabled) =>
-      `padding:6px 12px;border-radius:8px;border:1.5px solid ${active ? 'var(--primary)' : 'var(--border)'};
-       background:${active ? 'var(--primary)' : '#fff'};color:${active ? '#fff' : 'var(--text)'};
-       font-size:13px;font-weight:600;cursor:${disabled ? 'default' : 'pointer'};opacity:${disabled ? '.38' : '1'};min-width:38px`;
-
-    /* Build smart page list: always show first, last, current±1, ellipsis between gaps */
     const pages = [];
     if (total <= 5) {
       for (let i = 1; i <= total; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (page > 3)           pages.push('...');
+      if (page > 3)         pages.push('...');
       const lo = Math.max(2, page - 1);
       const hi = Math.min(total - 1, page + 1);
       for (let i = lo; i <= hi; i++) pages.push(i);
-      if (page < total - 2)   pages.push('...');
+      if (page < total - 2) pages.push('...');
       pages.push(total);
     }
 
-    let html = `<button onclick="goPage(${page-1})" ${page===1?'disabled':''}
-      style="${btn(false, page===1)}">‹ Anterior</button>`;
-
-    for (const p of pages) {
-      if (p === '...') {
-        html += `<span style="padding:0 2px;color:var(--text-muted);font-size:15px;font-weight:700">…</span>`;
+    let h = `<div style="display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap">`;
+    h += `<button onclick="goPage(${page-1})" ${page===1?'disabled':''} style="${bStyle(false,page===1)}">‹ Anterior</button>`;
+    for (const pg of pages) {
+      if (pg === '...') {
+        h += `<span style="padding:0 4px;color:var(--text-muted);font-weight:700">…</span>`;
       } else {
-        html += `<button onclick="goPage(${p})" style="${btn(p===page, false)}">${p}</button>`;
+        h += `<button onclick="goPage(${pg})" style="${bStyle(pg===page,false)}">${pg}</button>`;
       }
     }
+    h += `<button onclick="goPage(${page+1})" ${page===total?'disabled':''} style="${bStyle(false,page===total)}">Siguiente ›</button>`;
+    h += `</div>`;
+    return h;
+  }
 
-    html += `<button onclick="goPage(${page+1})" ${page===total?'disabled':''}
-      style="${btn(false, page===total)}">Siguiente ›</button>`;
-
-    wrap.innerHTML = html;
+  function renderPagination(page, total) {
+    const html = buildPaginationHtml(page, total);
+    document.getElementById('pagination-top').innerHTML    = html;
+    document.getElementById('pagination-bottom').innerHTML = html;
   }
 
   function goPage(p) {
@@ -213,8 +284,27 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /* ── skeleton ── */
+  function showSkeletonLoading(n = 12) {
+    const grid  = document.getElementById('catalog');
+    const empty = document.getElementById('catalog-empty');
+    empty.classList.add('hidden');
+    grid.innerHTML = Array.from({length: n}, () => `
+      <div class="skel-card">
+        <div class="skel skel-img"></div>
+        <div class="skel-body">
+          <div class="skel" style="height:12px;width:40%;border-radius:4px"></div>
+          <div class="skel" style="height:14px;width:90%;border-radius:4px"></div>
+          <div class="skel" style="height:18px;width:55%;border-radius:4px"></div>
+          <div class="skel" style="height:11px;width:35%;border-radius:4px"></div>
+          <div class="skel" style="height:22px;width:45%;border-radius:99px;margin-top:2px"></div>
+        </div>
+      </div>`).join('');
+  }
+
   /* ── load ── */
   async function loadProducts() {
+    showSkeletonLoading();
     try {
       const res = await productosAPI.getAll();
       allProducts = res.data || [];
@@ -229,7 +319,7 @@
     try {
       const res = await categoriasAPI.getAll();
       _cats = res.data || [];
-      renderCategoryChips();
+      renderCategoryDropdown();
     } catch (err) { console.error(err); }
   }
 
@@ -237,15 +327,14 @@
   document.getElementById('search-input').addEventListener('input', e => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      searchQuery = e.target.value.trim().toLowerCase();
+      searchQuery = sinTildes(e.target.value.trim());
       currentPage = 1;
       applyFilters();
     }, 250);
   });
 
   document.getElementById('refresh-btn').addEventListener('click', () => {
-    loadCategories();
-    loadProducts();
+    loadCategories(); loadProducts();
   });
 
   window.addEventListener('resize', () => {
@@ -256,5 +345,24 @@
   loadCategories();
   loadProducts();
 </script>
+<!-- FOOTER -->
+<footer class="home-footer">
+  <div class="home-footer-inner">
+    <div>
+      <div class="home-footer-brand">
+        <i class="fa-solid fa-store"></i> La Tiendita Dulcecita
+      </div>
+      <p class="home-footer-sub">Tu tienda de confianza.</p>
+    </div>
+    <div>
+      <p style="font-size:13px;font-weight:600;color:#cbd5e1;margin-bottom:8px">Información</p>
+      <p class="home-footer-sub"><i class="fa-solid fa-location-dot" style="margin-right:6px"></i>Lima, Perú</p>
+    </div>
+  </div>
+  <div class="home-footer-inner" style="padding-top:0">
+    <p class="home-footer-copy" style="width:100%">&copy; 2026 La Tiendita Dulcecita. Todos los derechos reservados.</p>
+  </div>
+</footer>
+
 </body>
 </html>
