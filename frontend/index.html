@@ -267,7 +267,7 @@
         <div class="card">
           <div class="table-wrap">
             <table>
-              <thead><tr><th>#</th><th>Fecha</th><th>Total</th><th>Efectivo</th><th>Yape</th><th>Externo</th><th>Préstamo</th><th></th></tr></thead>
+              <thead><tr><th>#</th><th>Fecha</th><th>Total</th><th>Efectivo</th><th>Yape</th><th>Externo</th><th>Préstamo</th><th style="width:80px"></th></tr></thead>
               <tbody id="table-compras"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody>
             </table>
           </div>
@@ -555,6 +555,22 @@
     <div class="modal-footer">
       <button class="btn btn-outline" data-close="modal-compra">Cancelar</button>
       <button class="btn btn-primary" id="btn-guardar-compra"><i class="fa-solid fa-check"></i> Registrar Compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle Compra Modal -->
+<div class="modal-overlay hidden" id="modal-detalle-compra">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="detalle-compra-title"><i class="fa-solid fa-receipt" style="color:var(--primary);margin-right:6px"></i> Detalle de Compra</h3>
+      <button class="modal-close" data-close="modal-detalle-compra">&times;</button>
+    </div>
+    <div class="modal-body" id="detalle-compra-body">
+      <div style="text-align:center;padding:32px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-close="modal-detalle-compra">Cerrar</button>
     </div>
   </div>
 </div>

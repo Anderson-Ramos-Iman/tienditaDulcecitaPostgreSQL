@@ -783,10 +783,83 @@ function renderCompras(list) {
       <td>${fmt(c.monto_yape)}</td>
       <td>${fmt(c.monto_externo)}</td>
       <td>${fmt(c.monto_prestado)}</td>
-      <td>
-        <button class="btn btn-danger btn-sm" onclick="cancelarCompra(${c.id})"><i class="fa-solid fa-ban"></i></button>
+      <td style="display:flex;gap:5px">
+        <button class="btn btn-outline btn-sm" onclick="verDetalleCompra(${c.id})" title="Ver detalle"><i class="fa-solid fa-eye"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="cancelarCompra(${c.id})" title="Cancelar compra"><i class="fa-solid fa-ban"></i></button>
       </td>
     </tr>`).join('');
+}
+
+async function verDetalleCompra(id) {
+  document.getElementById('detalle-compra-title').innerHTML =
+    `<i class="fa-solid fa-receipt" style="color:var(--primary);margin-right:6px"></i> Compra #${id}`;
+  document.getElementById('detalle-compra-body').innerHTML =
+    `<div style="text-align:center;padding:32px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>`;
+  openModal('modal-detalle-compra');
+  try {
+    const res = await comprasAPI.getById(id);
+    const c   = res.data;
+    const det = c.detalles || [];
+    const payCards = [
+      { label:'Efectivo', val:c.monto_efectivo, color:'#10b981' },
+      { label:'Yape',     val:c.monto_yape,     color:'#8b5cf6' },
+      { label:'Externo',  val:c.monto_externo,  color:'#f59e0b' },
+      { label:'Préstamo', val:c.monto_prestado, color:'#ef4444' },
+    ].filter(x => parseFloat(x.val) > 0);
+
+    document.getElementById('detalle-compra-body').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px;color:var(--text-muted)">${fmtDate(c.fecha)}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--primary)">${fmt(c.total)}</div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">
+        ${payCards.map(p => `
+          <div style="display:flex;flex-direction:column;align-items:center;background:#f8fafc;
+               border:1px solid var(--border);border-radius:8px;padding:8px 18px;min-width:90px">
+            <span style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">${p.label}</span>
+            <span style="font-size:15px;font-weight:700;color:${p.color}">${fmt(p.val)}</span>
+          </div>`).join('')}
+        ${parseFloat(c.ajuste_redondeo) > 0 ? `
+          <div style="display:flex;flex-direction:column;align-items:center;background:#f8fafc;
+               border:1px solid var(--border);border-radius:8px;padding:8px 18px;min-width:90px">
+            <span style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Redondeo</span>
+            <span style="font-size:15px;font-weight:700;color:var(--text-muted)">-${fmt(c.ajuste_redondeo)}</span>
+          </div>` : ''}
+      </div>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #10b981;border-radius:10px;padding:14px 16px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:10px">
+          <i class="fa-solid fa-boxes-stacked" style="color:#10b981"></i> Productos (${det.length})
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Producto</th>
+              <th style="text-align:center">Cantidad</th>
+              <th style="text-align:right">Precio Unit.</th>
+              <th style="text-align:right">Subtotal</th>
+            </tr></thead>
+            <tbody>
+              ${det.map(d => `
+                <tr>
+                  <td>${d.producto_nombre}${d.es_bonificacion
+                    ? ' <span style="background:#fef3c7;color:#92400e;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:600">Bonif.</span>'
+                    : ''}</td>
+                  <td style="text-align:center">${d.cantidad}</td>
+                  <td style="text-align:right">${d.es_bonificacion ? '—' : fmt(d.precio_unitario)}</td>
+                  <td style="text-align:right">${d.es_bonificacion
+                    ? '<span style="color:var(--text-muted)">Gratis</span>'
+                    : fmt(d.cantidad * d.precio_unitario)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    document.getElementById('detalle-compra-body').innerHTML =
+      `<div style="text-align:center;padding:32px;color:var(--text-muted)">Error: ${e.message}</div>`;
+  }
 }
 
 document.getElementById('btn-filtrar-compras').addEventListener('click', () => {
